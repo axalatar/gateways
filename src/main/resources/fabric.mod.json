@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "gateways",
+  "version": "${version}",
+  "name": "Gateways",
+  "description": "",
+  "authors": [],
+  "contact": {},
+  "license": "All-Rights-Reserved",
+  "icon": "assets/gateways/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "client": [
+      "com.kingdre.gateways.client.GatewaysClient"
+    ],
+    "main": [
+      "com.kingdre.gateways.Gateways"
+    ]
+  },
+  "mixins": [
+    "gateways.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric": "*",
+    "minecraft": "${minecraft_version}"
+  }
+}
