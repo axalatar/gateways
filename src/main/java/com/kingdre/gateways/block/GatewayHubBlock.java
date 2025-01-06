@@ -6,6 +6,8 @@ import com.kingdre.gateways.block.entity.GatewaysBlockEntities;
 import com.kingdre.gateways.item.GatewaysItems;
 import net.minecraft.block.*;
 import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.block.entity.BrewingStandBlockEntity;
+import net.minecraft.block.entity.HopperBlockEntity;
 import net.minecraft.client.render.block.entity.StructureBlockBlockEntityRenderer;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.effect.StatusEffectInstance;
@@ -18,14 +20,18 @@ import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtElement;
 import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
+import net.minecraft.util.CuboidBlockIterator;
 import net.minecraft.util.Hand;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.math.Vec3i;
 import net.minecraft.world.StructureSpawns;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -34,7 +40,7 @@ import java.util.function.Function;
 
 public class GatewayHubBlock extends BlockWithEntity {
 
-    private final static int MAX_PAD_SIDE_LENGTH = 50;
+    private final static int MAX_PAD_SIDE_LENGTH = 51;
     // probably a good idea to have this
     // is there a better way to do a const in java?
 
@@ -52,7 +58,8 @@ public class GatewayHubBlock extends BlockWithEntity {
     @Override
     public ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player, Hand hand, BlockHitResult hit) {
         if (!world.isClient()) {
-            if (!player.getActiveHand().equals(hand)) return ActionResult.PASS;
+            if (!player.getActiveHand().equals(hand) || !player.getStackInHand(hand).isEmpty())
+                return ActionResult.PASS;
 
             BlockEntity entity = world.getBlockEntity(pos);
             if (entity == null || !entity.getType().equals(GatewaysBlockEntities.GATEWAY_HUB_BLOCK_ENTITY))
@@ -64,7 +71,77 @@ public class GatewayHubBlock extends BlockWithEntity {
             if (frequency.isEmpty()) return ActionResult.PASS;
 
 //            player.teleport(frequency.get(0), frequency.get(1), frequency.get(2));
-            player.sendMessage(Text.of(String.valueOf(validateGatewayPad(state, world, pos, true))));
+//            player.sendMessage(Text.of(String.valueOf(validateGatewayPad(state, world, pos, true))));
+            Box fromBox = validateGatewayPad(state, world, pos, true);
+
+            if (fromBox == null) return ActionResult.FAIL;
+
+            BlockPos tunedTo = BlockPos.ofFloored(frequency.get(0), frequency.get(1), frequency.get(2));
+            BlockEntity destinationEntity = world.getBlockEntity(tunedTo);
+
+            if (destinationEntity == null || !destinationEntity.getType().equals(GatewaysBlockEntities.GATEWAY_HUB_BLOCK_ENTITY))
+                return ActionResult.FAIL;
+
+            Box toBox = validateGatewayPad(world.getBlockState(tunedTo), world, tunedTo, true);
+
+            if(fromBox.intersects(toBox)) return ActionResult.FAIL;
+
+            Vec3d differenceDouble = toBox.getCenter().subtract(fromBox.getCenter());
+
+            Vec3i difference = new Vec3i(
+                    (int) differenceDouble.x,
+                    (int) differenceDouble.y,
+                    (int) differenceDouble.z
+            ); // this should be fine bc all the blocks are aligned to the same grid, so im pretty sure there won't be any decimal
+
+            if (fromBox.getXLength() <= toBox.getXLength()) {
+                CuboidBlockIterator iterator = new CuboidBlockIterator(
+                        (int) fromBox.minX,
+                        (int) fromBox.minY,
+                        (int) fromBox.minZ,
+                        (int) fromBox.maxX,
+                        (int) fromBox.maxY,
+                        (int) fromBox.maxZ
+                );
+
+                int i = 0;
+                // putting the extra i here because i don't trust the block iterator enough
+
+                List<BlockPos> blockList = new ArrayList<>();
+
+                while (iterator.step()) {
+                    if(i > Math.pow(MAX_PAD_SIDE_LENGTH, 2)) break; // just to be safe
+
+                    BlockPos fromPos = BlockPos.ofFloored(iterator.getX(), iterator.getY(), iterator.getZ());
+
+                    BlockState fromState = world.getBlockState(fromPos);
+                    BlockPos toPos = fromPos.add(difference);
+
+                    world.setBlockState(toPos, fromState);
+
+                    BlockEntity fromEntity = world.getBlockEntity(fromPos);
+
+                    if(fromEntity != null) {
+//                        BlockEntity.createFromNbt(toPos, fromState, fromEntity.createNbtWithId());
+
+                        BlockEntity toEntity = world.getBlockEntity(toPos);
+                        if(toEntity != null) {
+                            NbtCompound nbt = fromEntity.createNbt();
+
+                            fromEntity.markRemoved();
+                            toEntity.readNbt(nbt); // this makes the block use the nbt
+                            toEntity.markDirty();
+
+                        } // 100% chance there's a dupe glitch from this
+                    }
+
+                    blockList.add(fromPos);
+                    i++;
+                }
+
+                blockList.forEach((blockPos -> world.setBlockState(blockPos, Blocks.AIR.getDefaultState())));
+                return ActionResult.SUCCESS;
+            }
         }
         return ActionResult.PASS;
     }
@@ -105,31 +182,39 @@ public class GatewayHubBlock extends BlockWithEntity {
         // (0, 1)
         // (1, 1)
 
+        Function<BlockPos, Boolean> check = (BlockPos currentPos) ->
+                !world.getBlockState(currentPos).getBlock().equals(Blocks.AMETHYST_BLOCK);
+
+
         boolean failed = false;
 
         while (sideLength < MAX_PAD_SIDE_LENGTH) {
+
 
             perSide = sideLength / 2;
             for (int stage = 0; stage < 2; stage++) {
                 // stage 0 is checking the pad is filled in, stage 1 is checking if there's nothing above
 
-                Function<BlockPos, Boolean> check =
-                        stage == 0 ?
-                                (BlockPos currentPos) -> !world.getBlockState(currentPos).getBlock().equals(Blocks.AMETHYST_BLOCK) :
-                                (BlockPos currentPos) -> !isHighestBlock(world, currentPos);
-
                 for (int x = -perSide; x < perSide + 1; x++) {
-                    if (x == -perSide || x == perSide) {
-                        for (int z = -perSide; z < perSide + 1; z++) {
-                            failed = check.apply(pos.add(x, 0, z));
+                    if(stage == 0) {
+                        if (x == -perSide || x == perSide) {
+                            for (int z = -perSide; z < perSide + 1; z++) {
+                                failed = check.apply(pos.add(x, 0, z));
+                                if (failed) break;
+                            }
+                        } else {
+                            BlockPos minPos = pos.add(x, 0, -perSide);
+                            BlockPos maxPos = pos.add(x, 0, perSide);
+
+                            failed = check.apply(minPos) || check.apply(maxPos);
+                            // this is really ugly code but the other option is like 8 if statements so fine
+                        }
+                    }
+                    else {
+                        for(int z = -perSide; z < perSide + 1; z++) {
+                            failed = !isHighestBlock(world, pos.add(x, sideLength, z));
                             if (failed) break;
                         }
-                    } else {
-                        BlockPos minPos = pos.add(x, 0, -perSide);
-                        BlockPos maxPos = pos.add(x, 0, perSide);
-
-                        failed = check.apply(minPos) || check.apply(maxPos);
-                        // this is really ugly code but the other option is like 8 if statements so fine
                     }
                     if (failed) break;
                 }
