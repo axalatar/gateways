@@ -1,51 +1,48 @@
 package com.kingdre.gateways.block;
 
-import com.kingdre.gateways.Gateways;
 import com.kingdre.gateways.block.entity.GatewayHubBlockEntity;
 import com.kingdre.gateways.block.entity.GatewaysBlockEntities;
-import com.kingdre.gateways.item.GatewaysItems;
 import net.minecraft.block.*;
 import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.block.entity.BrewingStandBlockEntity;
-import net.minecraft.block.entity.HopperBlockEntity;
-import net.minecraft.client.render.block.entity.StructureBlockBlockEntityRenderer;
+import net.minecraft.block.enums.WallMountLocation;
 import net.minecraft.entity.Entity;
-import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.item.SwordItem;
 import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtElement;
+import net.minecraft.state.StateManager;
+import net.minecraft.state.property.BooleanProperty;
+import net.minecraft.state.property.Properties;
 import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.CuboidBlockIterator;
 import net.minecraft.util.Hand;
+import net.minecraft.util.TypeFilter;
 import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.math.Vec3i;
-import net.minecraft.world.StructureSpawns;
+import net.minecraft.util.math.*;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Optional;
-import java.util.function.Consumer;
 import java.util.function.Function;
 
 public class GatewayHubBlock extends BlockWithEntity {
+    private static final BooleanProperty POWERED = Properties.POWERED;
 
     private final static int MAX_PAD_SIDE_LENGTH = 51;
+    // must be an odd number
     // probably a good idea to have this
     // is there a better way to do a const in java?
 
     protected GatewayHubBlock() {
         super(Settings.copy(Blocks.AMETHYST_BLOCK).strength(10f));
+        this.setDefaultState(
+                this.stateManager.getDefaultState().with(POWERED, false)
+        );
+    }
+
+    @Override
+    protected void appendProperties(StateManager.Builder<Block, BlockState> builder) {
+        builder.add(POWERED);
     }
 
     @Nullable
@@ -61,6 +58,47 @@ public class GatewayHubBlock extends BlockWithEntity {
             if (!player.getActiveHand().equals(hand) || !player.getStackInHand(hand).isEmpty())
                 return ActionResult.PASS;
 
+            return attemptTeleport(state, world, pos);
+        }
+        return ActionResult.PASS;
+    }
+
+
+
+    @Override
+    public void neighborUpdate(BlockState state, World world, BlockPos pos, Block sourceBlock, BlockPos sourcePos, boolean notify) {
+        boolean powered = world.isReceivingRedstonePower(pos);
+        boolean alreadyPowered = state.get(POWERED);
+        if (!alreadyPowered) {
+            if (powered) {
+                this.attemptTeleport(state, world, pos);
+                world.setBlockState(pos, state.with(POWERED, true));
+            }
+        }
+        else if (!powered) world.setBlockState(pos, state.with(POWERED, false));
+    }
+
+    private void debug(World world, String message) {
+        world.getPlayers().forEach((playerEntity -> {
+            playerEntity.sendMessage(Text.of(message));
+        }));
+    }
+
+
+    private boolean isHighestBlock(World world, BlockPos pos) {
+        for (int y = pos.getY() + 1; y < world.getTopY(); y++) {
+            if (!world.getBlockState(pos.withY(y)).isAir()) return false;
+//            world.getBlockState(pos.withY(y));
+        }
+        return true;
+    }
+
+    /**
+     * Attempt to teleport blocks and entities from the gateway, validates the gateway before teleportation.
+     */
+    public ActionResult attemptTeleport(BlockState state, World world, BlockPos pos) {
+        if (!world.isClient()) {
+
             BlockEntity entity = world.getBlockEntity(pos);
             if (entity == null || !entity.getType().equals(GatewaysBlockEntities.GATEWAY_HUB_BLOCK_ENTITY))
                 return ActionResult.PASS;
@@ -70,8 +108,6 @@ public class GatewayHubBlock extends BlockWithEntity {
             List<Integer> frequency = hubEntity.heldFrequency;
             if (frequency.isEmpty()) return ActionResult.PASS;
 
-//            player.teleport(frequency.get(0), frequency.get(1), frequency.get(2));
-//            player.sendMessage(Text.of(String.valueOf(validateGatewayPad(state, world, pos, true))));
             Box fromBox = validateGatewayPad(state, world, pos, true);
 
             if (fromBox == null) return ActionResult.FAIL;
@@ -139,26 +175,21 @@ public class GatewayHubBlock extends BlockWithEntity {
                     i++;
                 }
 
-                blockList.forEach((blockPos -> world.setBlockState(blockPos, Blocks.AIR.getDefaultState())));
+                blockList.forEach((blockPos -> {
+                    world.setBlockState(blockPos, Blocks.AIR.getDefaultState());
+                    BlockPos toPos = blockPos.add(difference);
+                    world.updateNeighborsAlways(toPos, world.getBlockState(toPos).getBlock());
+                }));
+
+                world.getEntitiesByType(TypeFilter.instanceOf(Entity.class), fromBox.withMaxY(1000), o -> true).forEach((fromEntity -> {
+                    fromEntity.requestTeleportOffset(difference.getX(), difference.getY(), difference.getZ());
+                }));
+
+
                 return ActionResult.SUCCESS;
             }
         }
         return ActionResult.PASS;
-    }
-
-    private void debug(World world, String message) {
-        world.getPlayers().forEach((playerEntity -> {
-            playerEntity.sendMessage(Text.of(message));
-        }));
-    }
-
-
-    private boolean isHighestBlock(World world, BlockPos pos) {
-        for (int y = pos.getY() + 1; y < world.getTopY(); y++) {
-            if (!world.getBlockState(pos.withY(y)).isAir()) return false;
-//            world.getBlockState(pos.withY(y));
-        }
-        return true;
     }
 
     /**
@@ -231,7 +262,6 @@ public class GatewayHubBlock extends BlockWithEntity {
         if (failed && sideLength == 3) return null;
 
         sideLength -= 2;
-//        StructureBlockBlockEntityRenderer
 
         return Box.of(pos.up(perSide).toCenterPos(), sideLength, sideLength, sideLength);
     }

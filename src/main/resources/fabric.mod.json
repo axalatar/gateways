@@ -10,6 +10,9 @@
   "icon": "assets/gateways/icon.png",
   "environment": "*",
   "entrypoints": {
+    "fabric-datagen": [
+      "com.kingdre.gateways.GatewaysDataGenerator"
+    ],
     "client": [
       "com.kingdre.gateways.client.GatewaysClient"
     ],
