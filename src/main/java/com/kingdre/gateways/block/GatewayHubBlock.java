@@ -1,23 +1,21 @@
 package com.kingdre.gateways.block;
 
-import com.kingdre.gateways.Gateways;
 import com.kingdre.gateways.block.entity.GatewayHubBlockEntity;
 import com.kingdre.gateways.block.entity.GatewaysBlockEntities;
 import net.minecraft.block.*;
 import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.block.entity.BlockEntityTicker;
-import net.minecraft.block.entity.BlockEntityType;
 import net.minecraft.block.enums.WallMountLocation;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityType;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.nbt.NbtCompound;
+import net.minecraft.server.command.PlaceCommand;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.state.StateManager;
 import net.minecraft.state.property.BooleanProperty;
 import net.minecraft.state.property.Properties;
 import net.minecraft.structure.StructurePlacementData;
 import net.minecraft.structure.StructureTemplate;
-import net.minecraft.structure.StructureTemplateManager;
 import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.CuboidBlockIterator;
@@ -25,7 +23,6 @@ import net.minecraft.util.Hand;
 import net.minecraft.util.TypeFilter;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.*;
-import net.minecraft.util.math.random.Random;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
@@ -47,6 +44,28 @@ public class GatewayHubBlock extends BlockWithEntity {
                 this.stateManager.getDefaultState().with(POWERED, false)
         );
     }
+    /*
+    GRAPHICS CODE:
+    TODO render beam on teleport
+    TODO render skybox line
+    TODO render skybox circles
+    TODO particles on teleport
+    TODO screenshake and flash
+
+    NON-GRAPHICS CODE:
+    TODO resonant crystal
+    TODO resonant amethyst
+    TODO async block checking
+    TODO explosion on teleporting blocks into each other
+
+    OTHER:
+    TODO art
+    TODO sounds
+
+    PRESENTATION:
+    TODO testing
+    TODO video
+     */
 
     @Override
     protected void appendProperties(StateManager.Builder<Block, BlockState> builder) {
@@ -72,6 +91,7 @@ public class GatewayHubBlock extends BlockWithEntity {
     }
 
 
+
     @Override
     public void neighborUpdate(BlockState state, World world, BlockPos pos, Block sourceBlock, BlockPos sourcePos, boolean notify) {
         boolean powered = world.isReceivingRedstonePower(pos);
@@ -81,31 +101,8 @@ public class GatewayHubBlock extends BlockWithEntity {
                 this.attemptTeleport(state, world, pos);
                 world.setBlockState(pos, state.with(POWERED, true));
             }
-        } else if (!powered) world.setBlockState(pos, state.with(POWERED, false));
-    }
-
-    @Override
-    public void scheduledTick(BlockState state, ServerWorld world, BlockPos pos, Random random) {
-        if(!world.isClient()) {
-            BlockEntity blockEntity = world.getBlockEntity(pos);
-
-            if (blockEntity instanceof GatewayHubBlockEntity hubEntity && hubEntity.currentlyTransporting) {
-                BlockPos currentDestination = hubEntity.transportingDestination;
-
-                hubEntity.transportingStructure.place(
-                        world,
-                        currentDestination,
-                        pos,
-                        new StructurePlacementData(),
-                        random,
-                        Block.NOTIFY_ALL
-                );
-                hubEntity.transportingStructure = null;
-                hubEntity.transportingDestination = null;
-                hubEntity.currentlyTransporting = false;
-                hubEntity.markDirty();
-            }
         }
+        else if (!powered) world.setBlockState(pos, state.with(POWERED, false));
     }
 
     private void debug(World world, String message) {
@@ -138,18 +135,21 @@ public class GatewayHubBlock extends BlockWithEntity {
             List<Integer> frequency = hubEntity.heldFrequency;
             if (frequency.isEmpty()) return ActionResult.PASS;
 
-            BlockBox fromBox = validateGatewayPad(state, world, pos, true);
+            BlockBox fromBox = validateGatewayPad(state, world, pos, true, true);
 
             if (fromBox == null) return ActionResult.FAIL;
 
             BlockPos tunedTo = BlockPos.ofFloored(frequency.get(0), frequency.get(1), frequency.get(2));
+            debug(world, String.valueOf(tunedTo));
             BlockEntity destinationEntity = world.getBlockEntity(tunedTo);
 
             if (destinationEntity == null || !destinationEntity.getType().equals(GatewaysBlockEntities.GATEWAY_HUB_BLOCK_ENTITY))
                 return ActionResult.FAIL;
 
-            BlockBox toBox = validateGatewayPad(world.getBlockState(tunedTo), world, tunedTo, true);
+//            ((ServerWorld) world).getChunkManager().getChunk(0, 0)
 
+            BlockBox toBox = validateGatewayPad(world.getBlockState(tunedTo), world, tunedTo, true, false);
+            debug(world, String.valueOf(toBox));
             if (fromBox.intersects(toBox)) return ActionResult.FAIL;
 
 
@@ -164,20 +164,59 @@ public class GatewayHubBlock extends BlockWithEntity {
                         null
                 );
 
-//                NbtCompound structureNbt = new NbtCompound();
-//                template.writeNbt(structureNbt);
+                template.place(
+                        (ServerWorld) world,
+                        BlockPos.ofFloored(toBox.getMinX(), toBox.getMinY(), toBox.getMinZ()),
+                        BlockPos.ofFloored(toBox.getMinX(), toBox.getMinY(), toBox.getMinZ()),
+                        new StructurePlacementData(),
+                        world.getRandom(),
+                        Block.NOTIFY_ALL
+                );
 
-                hubEntity.setTransporting(template, new BlockPos(
-                        toBox.getMinX(),
-                        toBox.getMinY(),
-                        toBox.getMinZ()
-                ));
+                CuboidBlockIterator iterator = new CuboidBlockIterator(
+                        fromBox.getMinX(),
+                        fromBox.getMinY(),
+                        fromBox.getMinZ(),
+                        fromBox.getMaxX(),
+                        fromBox.getMaxY(),
+                        fromBox.getMaxZ()
+                );
 
-                fromBox.forEachVertex((blockPos -> world.setBlockState(pos, Blocks.AIR.getDefaultState())));
+                int i = 0;
+                // putting the extra i here because i don't trust the block iterator enough
 
-//                world.getEntitiesByType(TypeFilter.instanceOf(Entity.class), fromBox.withMaxY(1000), o -> true).forEach((fromEntity -> {
-//                    fromEntity.requestTeleportOffset(difference.getX(), difference.getY(), difference.getZ());
-//                }));
+                while (iterator.step()) {
+                    if(i > Math.pow(MAX_PAD_SIDE_LENGTH, 2)) break; // just to be safe
+
+                    BlockPos fromPos = BlockPos.ofFloored(iterator.getX(), iterator.getY(), iterator.getZ());
+
+                    BlockEntity fromEntity = world.getBlockEntity(fromPos);
+
+                    if(fromEntity != null)
+                        fromEntity.markRemoved();
+
+                    world.setBlockState(
+                            new BlockPos(
+                                    iterator.getX(),
+                                    iterator.getY(),
+                                    iterator.getZ()
+                            ),
+                            Blocks.AIR.getDefaultState()
+                    );
+                    i++;
+                }
+
+                Vec3d difference = new Vec3d(toBox.getMinX(), toBox.getMinY(), toBox.getMinZ())
+                        .subtract(fromBox.getMinX(), fromBox.getMinY(), fromBox.getMinZ());
+
+                world.getEntitiesByType(TypeFilter.instanceOf(Entity.class), Box.from(fromBox).withMaxY(1000), o -> true).forEach((fromEntity -> {
+                    if(fromEntity.getType() == EntityType.PLAYER) {
+                        fromEntity.requestTeleportOffset(difference.getX(), difference.getY(), difference.getZ());
+                    }
+                    else {
+                        fromEntity.remove(Entity.RemovalReason.DISCARDED);
+                    }
+                }));
 
 
                 return ActionResult.SUCCESS;
@@ -186,12 +225,12 @@ public class GatewayHubBlock extends BlockWithEntity {
         return ActionResult.PASS;
     }
 
-
     /**
      * Finds the largest valid gateway pad for this block. Returns the bounding box of the teleport area, or null if none.
-     * If updateState is true, will update the blockstate of the hub depending on whether there's a valid pad
+     * If updateState is true, will update the blockstate of the hub depending on whether there's a valid pad.
+     * If allowCargo is true, it will allow a cube above the teleport pad where blocks can be placed. Otherwise, they will be treated as obstructive.
      */
-    public BlockBox validateGatewayPad(BlockState state, World world, BlockPos pos, boolean updateState) {
+    public BlockBox validateGatewayPad(BlockState state, World world, BlockPos pos, boolean updateState, boolean allowCargo) {
         int sideLength = 3;
         int perSide = sideLength / 2;
 
@@ -210,6 +249,8 @@ public class GatewayHubBlock extends BlockWithEntity {
 
         Function<BlockPos, Boolean> check = (BlockPos currentPos) ->
                 !world.getBlockState(currentPos).getBlock().equals(Blocks.AMETHYST_BLOCK);
+
+//        debug(world, String.valueOf(check.apply(new BlockPos(1000, 1000, 1000))));
 
 
         boolean failed = false;
@@ -236,8 +277,19 @@ public class GatewayHubBlock extends BlockWithEntity {
                             // this is really ugly code but the other option is like 8 if statements so fine
                         }
                     } else {
-                        for (int z = -perSide; z < perSide + 1; z++) {
-                            failed = !isHighestBlock(world, pos.add(x, sideLength, z));
+                        if(x == -perSide || x == perSide) {
+                            for (int z = -perSide; z < perSide + 1; z++) {
+                                if(allowCargo) {
+                                    failed = !isHighestBlock(world, pos.add(x, sideLength, z));
+                                }
+                                else failed = !isHighestBlock(world, pos.add(x, 0, z));                                if (failed) break;
+                            }
+                        }
+                        for (int z = -perSide + 1; z < perSide; z++) {
+                            if(allowCargo) {
+                                failed = !world.getBlockState(pos.add(x, sideLength - 1, z))
+                                        .equals(Blocks.AIR.getDefaultState());
+                            }
                             if (failed) break;
                         }
                     }
@@ -272,6 +324,7 @@ public class GatewayHubBlock extends BlockWithEntity {
         Vec3d center = pos.toCenterPos();
         Vec3d corner1 = center.add(-sideLength / 2., 1, -sideLength / 2.);
         Vec3d corner2 = center.add(sideLength / 2., sideLength + 1, sideLength / 2.);
+
 
         return new BlockBox(
                 (int) corner1.x,
