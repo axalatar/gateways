@@ -1,16 +1,23 @@
 package com.kingdre.gateways.block;
 
+import com.kingdre.gateways.Gateways;
 import com.kingdre.gateways.block.entity.GatewayHubBlockEntity;
 import com.kingdre.gateways.block.entity.GatewaysBlockEntities;
 import net.minecraft.block.*;
 import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.block.entity.BlockEntityTicker;
+import net.minecraft.block.entity.BlockEntityType;
 import net.minecraft.block.enums.WallMountLocation;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.nbt.NbtCompound;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.state.StateManager;
 import net.minecraft.state.property.BooleanProperty;
 import net.minecraft.state.property.Properties;
+import net.minecraft.structure.StructurePlacementData;
+import net.minecraft.structure.StructureTemplate;
+import net.minecraft.structure.StructureTemplateManager;
 import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.CuboidBlockIterator;
@@ -18,6 +25,7 @@ import net.minecraft.util.Hand;
 import net.minecraft.util.TypeFilter;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.*;
+import net.minecraft.util.math.random.Random;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
@@ -64,7 +72,6 @@ public class GatewayHubBlock extends BlockWithEntity {
     }
 
 
-
     @Override
     public void neighborUpdate(BlockState state, World world, BlockPos pos, Block sourceBlock, BlockPos sourcePos, boolean notify) {
         boolean powered = world.isReceivingRedstonePower(pos);
@@ -74,8 +81,31 @@ public class GatewayHubBlock extends BlockWithEntity {
                 this.attemptTeleport(state, world, pos);
                 world.setBlockState(pos, state.with(POWERED, true));
             }
+        } else if (!powered) world.setBlockState(pos, state.with(POWERED, false));
+    }
+
+    @Override
+    public void scheduledTick(BlockState state, ServerWorld world, BlockPos pos, Random random) {
+        if(!world.isClient()) {
+            BlockEntity blockEntity = world.getBlockEntity(pos);
+
+            if (blockEntity instanceof GatewayHubBlockEntity hubEntity && hubEntity.currentlyTransporting) {
+                BlockPos currentDestination = hubEntity.transportingDestination;
+
+                hubEntity.transportingStructure.place(
+                        world,
+                        currentDestination,
+                        pos,
+                        new StructurePlacementData(),
+                        random,
+                        Block.NOTIFY_ALL
+                );
+                hubEntity.transportingStructure = null;
+                hubEntity.transportingDestination = null;
+                hubEntity.currentlyTransporting = false;
+                hubEntity.markDirty();
+            }
         }
-        else if (!powered) world.setBlockState(pos, state.with(POWERED, false));
     }
 
     private void debug(World world, String message) {
@@ -108,7 +138,7 @@ public class GatewayHubBlock extends BlockWithEntity {
             List<Integer> frequency = hubEntity.heldFrequency;
             if (frequency.isEmpty()) return ActionResult.PASS;
 
-            Box fromBox = validateGatewayPad(state, world, pos, true);
+            BlockBox fromBox = validateGatewayPad(state, world, pos, true);
 
             if (fromBox == null) return ActionResult.FAIL;
 
@@ -118,72 +148,36 @@ public class GatewayHubBlock extends BlockWithEntity {
             if (destinationEntity == null || !destinationEntity.getType().equals(GatewaysBlockEntities.GATEWAY_HUB_BLOCK_ENTITY))
                 return ActionResult.FAIL;
 
-            Box toBox = validateGatewayPad(world.getBlockState(tunedTo), world, tunedTo, true);
+            BlockBox toBox = validateGatewayPad(world.getBlockState(tunedTo), world, tunedTo, true);
 
-            if(fromBox.intersects(toBox)) return ActionResult.FAIL;
+            if (fromBox.intersects(toBox)) return ActionResult.FAIL;
 
-            Vec3d differenceDouble = toBox.getCenter().subtract(fromBox.getCenter());
 
-            Vec3i difference = new Vec3i(
-                    (int) differenceDouble.x,
-                    (int) differenceDouble.y,
-                    (int) differenceDouble.z
-            ); // this should be fine bc all the blocks are aligned to the same grid, so im pretty sure there won't be any decimal
+            if (fromBox.getBlockCountX() <= toBox.getBlockCountX()) {
 
-            if (fromBox.getXLength() <= toBox.getXLength()) {
-                CuboidBlockIterator iterator = new CuboidBlockIterator(
-                        (int) fromBox.minX,
-                        (int) fromBox.minY,
-                        (int) fromBox.minZ,
-                        (int) fromBox.maxX,
-                        (int) fromBox.maxY,
-                        (int) fromBox.maxZ
+                StructureTemplate template = new StructureTemplate();
+                template.saveFromWorld(
+                        world,
+                        BlockPos.ofFloored(fromBox.getMinX(), fromBox.getMinY(), fromBox.getMinZ()),
+                        fromBox.getDimensions(),
+                        true,
+                        null
                 );
 
-                int i = 0;
-                // putting the extra i here because i don't trust the block iterator enough
+//                NbtCompound structureNbt = new NbtCompound();
+//                template.writeNbt(structureNbt);
 
-                List<BlockPos> blockList = new ArrayList<>();
+                hubEntity.setTransporting(template, new BlockPos(
+                        toBox.getMinX(),
+                        toBox.getMinY(),
+                        toBox.getMinZ()
+                ));
 
-                while (iterator.step()) {
-                    if(i > Math.pow(MAX_PAD_SIDE_LENGTH, 2)) break; // just to be safe
+                fromBox.forEachVertex((blockPos -> world.setBlockState(pos, Blocks.AIR.getDefaultState())));
 
-                    BlockPos fromPos = BlockPos.ofFloored(iterator.getX(), iterator.getY(), iterator.getZ());
-
-                    BlockState fromState = world.getBlockState(fromPos);
-                    BlockPos toPos = fromPos.add(difference);
-
-                    world.setBlockState(toPos, fromState);
-
-                    BlockEntity fromEntity = world.getBlockEntity(fromPos);
-
-                    if(fromEntity != null) {
-//                        BlockEntity.createFromNbt(toPos, fromState, fromEntity.createNbtWithId());
-
-                        BlockEntity toEntity = world.getBlockEntity(toPos);
-                        if(toEntity != null) {
-                            NbtCompound nbt = fromEntity.createNbt();
-
-                            fromEntity.markRemoved();
-                            toEntity.readNbt(nbt); // this makes the block use the nbt
-                            toEntity.markDirty();
-
-                        } // 100% chance there's a dupe glitch from this
-                    }
-
-                    blockList.add(fromPos);
-                    i++;
-                }
-
-                blockList.forEach((blockPos -> {
-                    world.setBlockState(blockPos, Blocks.AIR.getDefaultState());
-                    BlockPos toPos = blockPos.add(difference);
-                    world.updateNeighborsAlways(toPos, world.getBlockState(toPos).getBlock());
-                }));
-
-                world.getEntitiesByType(TypeFilter.instanceOf(Entity.class), fromBox.withMaxY(1000), o -> true).forEach((fromEntity -> {
-                    fromEntity.requestTeleportOffset(difference.getX(), difference.getY(), difference.getZ());
-                }));
+//                world.getEntitiesByType(TypeFilter.instanceOf(Entity.class), fromBox.withMaxY(1000), o -> true).forEach((fromEntity -> {
+//                    fromEntity.requestTeleportOffset(difference.getX(), difference.getY(), difference.getZ());
+//                }));
 
 
                 return ActionResult.SUCCESS;
@@ -192,11 +186,12 @@ public class GatewayHubBlock extends BlockWithEntity {
         return ActionResult.PASS;
     }
 
+
     /**
      * Finds the largest valid gateway pad for this block. Returns the bounding box of the teleport area, or null if none.
      * If updateState is true, will update the blockstate of the hub depending on whether there's a valid pad
      */
-    public Box validateGatewayPad(BlockState state, World world, BlockPos pos, boolean updateState) {
+    public BlockBox validateGatewayPad(BlockState state, World world, BlockPos pos, boolean updateState) {
         int sideLength = 3;
         int perSide = sideLength / 2;
 
@@ -227,7 +222,7 @@ public class GatewayHubBlock extends BlockWithEntity {
                 // stage 0 is checking the pad is filled in, stage 1 is checking if there's nothing above
 
                 for (int x = -perSide; x < perSide + 1; x++) {
-                    if(stage == 0) {
+                    if (stage == 0) {
                         if (x == -perSide || x == perSide) {
                             for (int z = -perSide; z < perSide + 1; z++) {
                                 failed = check.apply(pos.add(x, 0, z));
@@ -240,9 +235,8 @@ public class GatewayHubBlock extends BlockWithEntity {
                             failed = check.apply(minPos) || check.apply(maxPos);
                             // this is really ugly code but the other option is like 8 if statements so fine
                         }
-                    }
-                    else {
-                        for(int z = -perSide; z < perSide + 1; z++) {
+                    } else {
+                        for (int z = -perSide; z < perSide + 1; z++) {
                             failed = !isHighestBlock(world, pos.add(x, sideLength, z));
                             if (failed) break;
                         }
@@ -263,6 +257,29 @@ public class GatewayHubBlock extends BlockWithEntity {
 
         sideLength -= 2;
 
-        return Box.of(pos.up(perSide).toCenterPos(), sideLength, sideLength, sideLength);
+//        Vec3d center = pos.up(perSide).toCenterPos();
+
+//        return BlockBox.create(
+//                new Vec3i(
+//                        (int) (center.x - sideLength / 2.0),
+//                        (int) (center.y - sideLength / 2.0),
+//                        (int) (center.z - sideLength / 2.0)),
+//                new Vec3i(
+//                        (int) (center.x + sideLength / 2.0),
+//                        (int) (center.y + sideLength / 2.0),
+//                        (int) (center.z + sideLength / 2.0)
+//                ));
+        Vec3d center = pos.toCenterPos();
+        Vec3d corner1 = center.add(-sideLength / 2., 1, -sideLength / 2.);
+        Vec3d corner2 = center.add(sideLength / 2., sideLength + 1, sideLength / 2.);
+
+        return new BlockBox(
+                (int) corner1.x,
+                (int) corner1.y,
+                (int) corner1.z,
+                (int) corner2.x,
+                (int) corner2.y,
+                (int) corner2.z
+        );
     }
 }

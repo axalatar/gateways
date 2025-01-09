@@ -5,6 +5,7 @@ import com.kingdre.gateways.block.entity.GatewaysBlockEntities;
 import com.kingdre.gateways.item.GatewaysItemGroups;
 import com.kingdre.gateways.item.GatewaysItems;
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.loader.api.FabricLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
