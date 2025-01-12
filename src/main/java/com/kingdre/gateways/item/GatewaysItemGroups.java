@@ -21,6 +21,8 @@ public class GatewaysItemGroups {
 
                         entries.add(GatewaysItems.TUNING_FORK);
                         entries.add(GatewaysBlocks.GATEWAY_HUB);
+                        entries.add(GatewaysBlocks.RESONANT_AMETHYST);
+                        entries.add(GatewaysBlocks.RESONANCE_CONDUIT);
                     })
                     .build()
     );

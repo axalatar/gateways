@@ -2,6 +2,7 @@ package com.kingdre.gateways.block.entity;
 
 import com.kingdre.gateways.Gateways;
 import com.kingdre.gateways.block.GatewaysBlocks;
+import com.kingdre.gateways.block.ResonanceConduitBlock;
 import net.fabricmc.fabric.api.object.builder.v1.block.entity.FabricBlockEntityTypeBuilder;
 import net.minecraft.block.Block;
 import net.minecraft.block.entity.BlockEntity;
@@ -18,6 +19,13 @@ public static final BlockEntityType<GatewayHubBlockEntity> GATEWAY_HUB_BLOCK_ENT
                 GatewayHubBlockEntity::new,
                 GatewaysBlocks.GATEWAY_HUB
 );
+
+public static final BlockEntityType<ResonanceConduitBlockEntity> RESONANCE_CONDUIT_BLOCK_ENTITY =
+        registerBlockEntity(
+                "resonance_conduit",
+                ResonanceConduitBlockEntity::new,
+                GatewaysBlocks.RESONANCE_CONDUIT
+        );
 
 
 

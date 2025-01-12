@@ -1,8 +1,7 @@
 package com.kingdre.gateways.block;
 
 import com.kingdre.gateways.Gateways;
-import net.minecraft.block.Block;
-import net.minecraft.block.DispenserBlock;
+import net.minecraft.block.*;
 import net.minecraft.item.BlockItem;
 import net.minecraft.item.Item;
 import net.minecraft.registry.Registries;
@@ -11,6 +10,9 @@ import net.minecraft.util.Identifier;
 
 public class GatewaysBlocks {
     public static final Block GATEWAY_HUB = registerBlock("gateway_hub", new GatewayHubBlock());
+    public static final Block RESONANCE_CONDUIT = registerBlock("resonance_conduit", new ResonanceConduitBlock());
+
+    public static final Block RESONANT_AMETHYST = registerBlock("resonant_amethyst", new Block(AbstractBlock.Settings.copy(Blocks.AMETHYST_BLOCK)));
 
     private static Block registerBlock(String name, Block block) {
         registerBlockItem(name, block);

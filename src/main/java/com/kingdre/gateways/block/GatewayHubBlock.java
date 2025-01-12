@@ -8,11 +8,13 @@ import net.minecraft.block.enums.WallMountLocation;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.ItemPlacementContext;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.server.command.PlaceCommand;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.state.StateManager;
 import net.minecraft.state.property.BooleanProperty;
+import net.minecraft.state.property.DirectionProperty;
 import net.minecraft.state.property.Properties;
 import net.minecraft.structure.StructurePlacementData;
 import net.minecraft.structure.StructureTemplate;
@@ -32,6 +34,9 @@ import java.util.function.Function;
 
 public class GatewayHubBlock extends BlockWithEntity {
     private static final BooleanProperty POWERED = Properties.POWERED;
+    public static final DirectionProperty FACING = HorizontalFacingBlock.FACING;
+    public static final BooleanProperty OPEN = BooleanProperty.of("open");
+
 
     private final static int MAX_PAD_SIDE_LENGTH = 51;
     // must be an odd number
@@ -41,8 +46,9 @@ public class GatewayHubBlock extends BlockWithEntity {
     protected GatewayHubBlock() {
         super(Settings.copy(Blocks.AMETHYST_BLOCK).strength(10f));
         this.setDefaultState(
-                this.stateManager.getDefaultState().with(POWERED, false)
+                this.stateManager.getDefaultState().with(POWERED, false).with(FACING, Direction.NORTH).with(OPEN, false)
         );
+
     }
     /*
     GRAPHICS CODE:
@@ -53,14 +59,17 @@ public class GatewayHubBlock extends BlockWithEntity {
     TODO screenshake and flash
 
     NON-GRAPHICS CODE:
-    TODO resonant crystal
-    TODO resonant amethyst
     TODO async block checking
     TODO explosion on teleporting blocks into each other
+    TODO teleportation cost
+    TODO fix teleporting outside pad
+    TODO explode on going up into blocks
+    TODO automatically open/close on pad completed/destroyed
 
     OTHER:
-    TODO art
     TODO sounds
+    TODO recipes
+    TODO resonance conduit model
 
     PRESENTATION:
     TODO testing
@@ -69,7 +78,7 @@ public class GatewayHubBlock extends BlockWithEntity {
 
     @Override
     protected void appendProperties(StateManager.Builder<Block, BlockState> builder) {
-        builder.add(POWERED);
+        builder.add(POWERED).add(FACING).add(OPEN);
     }
 
     @Nullable
@@ -94,12 +103,14 @@ public class GatewayHubBlock extends BlockWithEntity {
 
     @Override
     public void neighborUpdate(BlockState state, World world, BlockPos pos, Block sourceBlock, BlockPos sourcePos, boolean notify) {
+        if(world.isClient()) return;
+
         boolean powered = world.isReceivingRedstonePower(pos);
         boolean alreadyPowered = state.get(POWERED);
         if (!alreadyPowered) {
             if (powered) {
                 this.attemptTeleport(state, world, pos);
-                world.setBlockState(pos, state.with(POWERED, true));
+                world.setBlockState(pos, state.with(POWERED, true), Block.NO_REDRAW);
             }
         }
         else if (!powered) world.setBlockState(pos, state.with(POWERED, false));
@@ -126,6 +137,7 @@ public class GatewayHubBlock extends BlockWithEntity {
     public ActionResult attemptTeleport(BlockState state, World world, BlockPos pos) {
         if (!world.isClient()) {
 
+
             BlockEntity entity = world.getBlockEntity(pos);
             if (entity == null || !entity.getType().equals(GatewaysBlockEntities.GATEWAY_HUB_BLOCK_ENTITY))
                 return ActionResult.PASS;
@@ -135,9 +147,12 @@ public class GatewayHubBlock extends BlockWithEntity {
             List<Integer> frequency = hubEntity.heldFrequency;
             if (frequency.isEmpty()) return ActionResult.PASS;
 
+            boolean open = state.get(OPEN);
             BlockBox fromBox = validateGatewayPad(state, world, pos, true, true);
 
+            debug(world, String.valueOf(open));
             if (fromBox == null) return ActionResult.FAIL;
+            if(!open) return ActionResult.SUCCESS;
 
             BlockPos tunedTo = BlockPos.ofFloored(frequency.get(0), frequency.get(1), frequency.get(2));
             debug(world, String.valueOf(tunedTo));
@@ -232,7 +247,7 @@ public class GatewayHubBlock extends BlockWithEntity {
      */
     public BlockBox validateGatewayPad(BlockState state, World world, BlockPos pos, boolean updateState, boolean allowCargo) {
         int sideLength = 3;
-        int perSide = sideLength / 2;
+        int perSide;
 
         // 3 --> {-1, 0, 1}
         // 5 --> {-2, -1, 0, 1, 2}
@@ -247,8 +262,10 @@ public class GatewayHubBlock extends BlockWithEntity {
         // (0, 1)
         // (1, 1)
 
-        Function<BlockPos, Boolean> check = (BlockPos currentPos) ->
-                !world.getBlockState(currentPos).getBlock().equals(Blocks.AMETHYST_BLOCK);
+        Function<BlockPos, Boolean> check = (BlockPos currentPos) -> {
+            Block block = world.getBlockState(currentPos).getBlock();
+            return !(block.equals(Blocks.AMETHYST_BLOCK) || block.equals(GatewaysBlocks.RESONANT_AMETHYST));
+        };
 
 //        debug(world, String.valueOf(check.apply(new BlockPos(1000, 1000, 1000))));
 
@@ -305,7 +322,10 @@ public class GatewayHubBlock extends BlockWithEntity {
 
             sideLength += 2;
         }
-        if (failed && sideLength == 3) return null;
+        if (failed && sideLength == 3) {
+            if(updateState) world.setBlockState(pos, state.with(OPEN, false));
+            return null;
+        }
 
         sideLength -= 2;
 
@@ -325,7 +345,8 @@ public class GatewayHubBlock extends BlockWithEntity {
         Vec3d corner1 = center.add(-sideLength / 2., 1, -sideLength / 2.);
         Vec3d corner2 = center.add(sideLength / 2., sideLength + 1, sideLength / 2.);
 
-
+        if(updateState) world.setBlockState(pos, state.with(OPEN, true));
+        debug(world, String.valueOf(updateState));
         return new BlockBox(
                 (int) corner1.x,
                 (int) corner1.y,
@@ -334,5 +355,16 @@ public class GatewayHubBlock extends BlockWithEntity {
                 (int) corner2.y,
                 (int) corner2.z
         );
+    }
+
+
+    @Override
+    public BlockRenderType getRenderType(BlockState state) {
+        return BlockRenderType.MODEL;
+    }
+
+    @Override
+    public BlockState getPlacementState(ItemPlacementContext ctx) {
+        return this.getDefaultState().with(FACING, ctx.getHorizontalPlayerFacing().getOpposite());
     }
 }
