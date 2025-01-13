@@ -10,6 +10,8 @@ import net.minecraft.entity.EntityType;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemPlacementContext;
 import net.minecraft.nbt.NbtCompound;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.ServerTask;
 import net.minecraft.server.command.PlaceCommand;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.state.StateManager;
@@ -30,6 +32,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
 public class GatewayHubBlock extends BlockWithEntity {
@@ -38,7 +41,7 @@ public class GatewayHubBlock extends BlockWithEntity {
     public static final BooleanProperty OPEN = BooleanProperty.of("open");
 
 
-    private final static int MAX_PAD_SIDE_LENGTH = 51;
+    private final static int MAX_PAD_SIDE_LENGTH = 7;
     // must be an odd number
     // probably a good idea to have this
     // is there a better way to do a const in java?
@@ -59,11 +62,8 @@ public class GatewayHubBlock extends BlockWithEntity {
     TODO screenshake and flash
 
     NON-GRAPHICS CODE:
-    TODO async block checking
-    TODO explosion on teleporting blocks into each other
     TODO teleportation cost
     TODO fix teleporting outside pad
-    TODO explode on going up into blocks
     TODO automatically open/close on pad completed/destroyed
 
     OTHER:
@@ -100,10 +100,9 @@ public class GatewayHubBlock extends BlockWithEntity {
     }
 
 
-
     @Override
     public void neighborUpdate(BlockState state, World world, BlockPos pos, Block sourceBlock, BlockPos sourcePos, boolean notify) {
-        if(world.isClient()) return;
+        if (world.isClient()) return;
 
         boolean powered = world.isReceivingRedstonePower(pos);
         boolean alreadyPowered = state.get(POWERED);
@@ -112,8 +111,7 @@ public class GatewayHubBlock extends BlockWithEntity {
                 this.attemptTeleport(state, world, pos);
                 world.setBlockState(pos, state.with(POWERED, true), Block.NO_REDRAW);
             }
-        }
-        else if (!powered) world.setBlockState(pos, state.with(POWERED, false));
+        } else if (!powered) world.setBlockState(pos, state.with(POWERED, false));
     }
 
     private void debug(World world, String message) {
@@ -123,20 +121,11 @@ public class GatewayHubBlock extends BlockWithEntity {
     }
 
 
-    private boolean isHighestBlock(World world, BlockPos pos) {
-        for (int y = pos.getY() + 1; y < world.getTopY(); y++) {
-            if (!world.getBlockState(pos.withY(y)).isAir()) return false;
-//            world.getBlockState(pos.withY(y));
-        }
-        return true;
-    }
-
     /**
      * Attempt to teleport blocks and entities from the gateway, validates the gateway before teleportation.
      */
     public ActionResult attemptTeleport(BlockState state, World world, BlockPos pos) {
         if (!world.isClient()) {
-
 
             BlockEntity entity = world.getBlockEntity(pos);
             if (entity == null || !entity.getType().equals(GatewaysBlockEntities.GATEWAY_HUB_BLOCK_ENTITY))
@@ -147,25 +136,36 @@ public class GatewayHubBlock extends BlockWithEntity {
             List<Integer> frequency = hubEntity.heldFrequency;
             if (frequency.isEmpty()) return ActionResult.PASS;
 
+            MinecraftServer server = ((ServerWorld) world).getServer();
+
             boolean open = state.get(OPEN);
             BlockBox fromBox = validateGatewayPad(state, world, pos, true, true);
+            if(fromBox == null) {
+                world.setBlockState(pos, state.with(OPEN, false));
+                return ActionResult.PASS;
+            }
 
-            debug(world, String.valueOf(open));
-            if (fromBox == null) return ActionResult.FAIL;
-            if(!open) return ActionResult.SUCCESS;
+            if (!open) {
+                world.setBlockState(pos, state.with(OPEN, true));
+                return ActionResult.SUCCESS;
+            }
 
             BlockPos tunedTo = BlockPos.ofFloored(frequency.get(0), frequency.get(1), frequency.get(2));
-            debug(world, String.valueOf(tunedTo));
             BlockEntity destinationEntity = world.getBlockEntity(tunedTo);
 
             if (destinationEntity == null || !destinationEntity.getType().equals(GatewaysBlockEntities.GATEWAY_HUB_BLOCK_ENTITY))
-                return ActionResult.FAIL;
+                return ActionResult.PASS;
 
 //            ((ServerWorld) world).getChunkManager().getChunk(0, 0)
 
             BlockBox toBox = validateGatewayPad(world.getBlockState(tunedTo), world, tunedTo, true, false);
-            debug(world, String.valueOf(toBox));
-            if (fromBox.intersects(toBox)) return ActionResult.FAIL;
+
+            if(toBox == null) {
+                return ActionResult.PASS;
+            }
+
+
+            if (fromBox.intersects(toBox)) return ActionResult.PASS;
 
 
             if (fromBox.getBlockCountX() <= toBox.getBlockCountX()) {
@@ -201,13 +201,13 @@ public class GatewayHubBlock extends BlockWithEntity {
                 // putting the extra i here because i don't trust the block iterator enough
 
                 while (iterator.step()) {
-                    if(i > Math.pow(MAX_PAD_SIDE_LENGTH, 2)) break; // just to be safe
+                    if (i > Math.pow(MAX_PAD_SIDE_LENGTH, 2)) break; // just to be safe
 
                     BlockPos fromPos = BlockPos.ofFloored(iterator.getX(), iterator.getY(), iterator.getZ());
 
                     BlockEntity fromEntity = world.getBlockEntity(fromPos);
 
-                    if(fromEntity != null)
+                    if (fromEntity != null)
                         fromEntity.markRemoved();
 
                     world.setBlockState(
@@ -225,29 +225,24 @@ public class GatewayHubBlock extends BlockWithEntity {
                         .subtract(fromBox.getMinX(), fromBox.getMinY(), fromBox.getMinZ());
 
                 world.getEntitiesByType(TypeFilter.instanceOf(Entity.class), Box.from(fromBox).withMaxY(1000), o -> true).forEach((fromEntity -> {
-                    if(fromEntity.getType() == EntityType.PLAYER) {
+                    if (fromEntity.getType() == EntityType.PLAYER) {
                         fromEntity.requestTeleportOffset(difference.getX(), difference.getY(), difference.getZ());
-                    }
-                    else {
+                    } else {
                         fromEntity.remove(Entity.RemovalReason.DISCARDED);
                     }
                 }));
-
-
-                return ActionResult.SUCCESS;
             }
+            return ActionResult.SUCCESS;
         }
         return ActionResult.PASS;
     }
 
     /**
-     * Finds the largest valid gateway pad for this block. Returns the bounding box of the teleport area, or null if none.
+     * Finds the largest valid gateway pad for this block. Returns the side length of the teleport area, or null if none.
      * If updateState is true, will update the blockstate of the hub depending on whether there's a valid pad.
      * If allowCargo is true, it will allow a cube above the teleport pad where blocks can be placed. Otherwise, they will be treated as obstructive.
      */
     public BlockBox validateGatewayPad(BlockState state, World world, BlockPos pos, boolean updateState, boolean allowCargo) {
-        int sideLength = 3;
-        int perSide;
 
         // 3 --> {-1, 0, 1}
         // 5 --> {-2, -1, 0, 1, 2}
@@ -261,55 +256,39 @@ public class GatewayHubBlock extends BlockWithEntity {
         // (-1, 1)
         // (0, 1)
         // (1, 1)
-
-        Function<BlockPos, Boolean> check = (BlockPos currentPos) -> {
-            Block block = world.getBlockState(currentPos).getBlock();
-            return !(block.equals(Blocks.AMETHYST_BLOCK) || block.equals(GatewaysBlocks.RESONANT_AMETHYST));
-        };
-
-//        debug(world, String.valueOf(check.apply(new BlockPos(1000, 1000, 1000))));
+            int sideLength = 3;
+            int perSide;
 
 
-        boolean failed = false;
+            Function<BlockPos, Boolean> check = (BlockPos currentPos) -> {
 
-        while (sideLength < MAX_PAD_SIDE_LENGTH) {
+                Block block = world.getBlockState(currentPos).getBlock();
+                return !(block.equals(Blocks.AMETHYST_BLOCK) || block.equals(GatewaysBlocks.RESONANT_AMETHYST));
+            };
 
 
-            perSide = sideLength / 2;
-            for (int stage = 0; stage < 2; stage++) {
+            boolean failed = false;
+
+            while (sideLength < MAX_PAD_SIDE_LENGTH) {
+
+
+                perSide = sideLength / 2;
                 // stage 0 is checking the pad is filled in, stage 1 is checking if there's nothing above
 
                 for (int x = -perSide; x < perSide + 1; x++) {
-                    if (stage == 0) {
-                        if (x == -perSide || x == perSide) {
-                            for (int z = -perSide; z < perSide + 1; z++) {
-                                failed = check.apply(pos.add(x, 0, z));
-                                if (failed) break;
-                            }
-                        } else {
-                            BlockPos minPos = pos.add(x, 0, -perSide);
-                            BlockPos maxPos = pos.add(x, 0, perSide);
-
-                            failed = check.apply(minPos) || check.apply(maxPos);
-                            // this is really ugly code but the other option is like 8 if statements so fine
-                        }
-                    } else {
-                        if(x == -perSide || x == perSide) {
-                            for (int z = -perSide; z < perSide + 1; z++) {
-                                if(allowCargo) {
-                                    failed = !isHighestBlock(world, pos.add(x, sideLength, z));
-                                }
-                                else failed = !isHighestBlock(world, pos.add(x, 0, z));                                if (failed) break;
-                            }
-                        }
-                        for (int z = -perSide + 1; z < perSide; z++) {
-                            if(allowCargo) {
-                                failed = !world.getBlockState(pos.add(x, sideLength - 1, z))
-                                        .equals(Blocks.AIR.getDefaultState());
-                            }
+                    if (x == -perSide || x == perSide) {
+                        for (int z = -perSide; z < perSide + 1; z++) {
+                            failed = check.apply(pos.add(x, 0, z));
                             if (failed) break;
                         }
+                    } else {
+                        BlockPos minPos = pos.add(x, 0, -perSide);
+                        BlockPos maxPos = pos.add(x, 0, perSide);
+
+                        failed = check.apply(minPos) || check.apply(maxPos);
+                        // this is really ugly code but the other option is like 8 if statements so fine
                     }
+
                     if (failed) break;
                 }
 
@@ -317,44 +296,38 @@ public class GatewayHubBlock extends BlockWithEntity {
                 // maybe this is useless but apparently java only breaks from one loop at a time????
                 // i did not know about that man
 
+
+
+                sideLength += 2;
             }
-            if (failed) break;
 
-            sideLength += 2;
-        }
-        if (failed && sideLength == 3) {
-            if(updateState) world.setBlockState(pos, state.with(OPEN, false));
-            return null;
-        }
+            sideLength -= 2;
+            Vec3d center = pos.toCenterPos();
+            Vec3d corner1 = center.add(-sideLength / 2., 1, -sideLength / 2.);
+            Vec3d corner2 = center.add(sideLength / 2., sideLength + 1, sideLength / 2.);
 
-        sideLength -= 2;
+            BlockBox box = new BlockBox(
+                    (int) corner1.x,
+                    (int) corner1.y,
+                    (int) corner1.z,
+                    (int) corner2.x,
+                    (int) corner2.y,
+                    (int) corner2.z
+            );
 
-//        Vec3d center = pos.up(perSide).toCenterPos();
+            if (box.getBlockCountX() < 3) return null;
 
-//        return BlockBox.create(
-//                new Vec3i(
-//                        (int) (center.x - sideLength / 2.0),
-//                        (int) (center.y - sideLength / 2.0),
-//                        (int) (center.z - sideLength / 2.0)),
-//                new Vec3i(
-//                        (int) (center.x + sideLength / 2.0),
-//                        (int) (center.y + sideLength / 2.0),
-//                        (int) (center.z + sideLength / 2.0)
-//                ));
-        Vec3d center = pos.toCenterPos();
-        Vec3d corner1 = center.add(-sideLength / 2., 1, -sideLength / 2.);
-        Vec3d corner2 = center.add(sideLength / 2., sideLength + 1, sideLength / 2.);
 
-        if(updateState) world.setBlockState(pos, state.with(OPEN, true));
-        debug(world, String.valueOf(updateState));
-        return new BlockBox(
-                (int) corner1.x,
-                (int) corner1.y,
-                (int) corner1.z,
-                (int) corner2.x,
-                (int) corner2.y,
-                (int) corner2.z
-        );
+            for(int x = box.getMinX(); x < box.getMaxX() + 1; x++) {
+                for(int y = box.getMinY(); y < box.getMaxY() + 1; y++) {
+                    for(int z = box.getMinZ(); z < box.getMaxZ() + 1; z++) {
+                        if(!world.getBlockState(new BlockPos(x, y, z)).isAir()) {
+                            return null;
+                        }
+                    }
+                }
+            }
+            return box;
     }
 
 
