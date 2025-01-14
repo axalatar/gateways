@@ -14,6 +14,10 @@ public class GatewaysBlocks {
 
     public static final Block RESONANT_AMETHYST = registerBlock("resonant_amethyst", new Block(AbstractBlock.Settings.copy(Blocks.AMETHYST_BLOCK)));
 
+    public static final Block CRACKED_AMETHYST = registerBlock("cracked_amethyst", new CrackedAmethystBlock(AbstractBlock.Settings.copy(Blocks.AMETHYST_BLOCK)));
+    public static final Block CRACKED_RESONANT_AMETHYST = registerBlock("cracked_resonant_amethyst", new CrackedResonantAmethystBlock(AbstractBlock.Settings.copy(Blocks.AMETHYST_BLOCK)));
+
+
     private static Block registerBlock(String name, Block block) {
         registerBlockItem(name, block);
         return Registry.register(Registries.BLOCK, Identifier.of(Gateways.MOD_ID, name), block);

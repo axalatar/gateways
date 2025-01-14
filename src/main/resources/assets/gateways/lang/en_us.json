@@ -3,6 +3,7 @@
 
   "block.gateways.gateway_hub": "Gateway Hub",
   "block.gateways.resonant_amethyst": "Resonant Amethyst",
+  "block.gateways.cracked_amethyst": "Cracked Amethyst",
 
   "itemgroup.gateways": "Gateways"
 }

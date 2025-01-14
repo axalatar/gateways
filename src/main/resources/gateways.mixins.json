@@ -4,6 +4,7 @@
   "package": "com.kingdre.gateways.mixin",
   "compatibilityLevel": "JAVA_17",
   "mixins": [
+    "ExperienceBottleMixin"
   ],
   "client": [
   ],

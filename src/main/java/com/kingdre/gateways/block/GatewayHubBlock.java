@@ -4,11 +4,15 @@ import com.kingdre.gateways.block.entity.GatewayHubBlockEntity;
 import com.kingdre.gateways.block.entity.GatewaysBlockEntities;
 import net.minecraft.block.*;
 import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.block.entity.SculkSpreadManager;
 import net.minecraft.block.enums.WallMountLocation;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
+import net.minecraft.entity.ExperienceOrbEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemPlacementContext;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.ServerTask;
@@ -27,6 +31,7 @@ import net.minecraft.util.Hand;
 import net.minecraft.util.TypeFilter;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.*;
+import net.minecraft.util.math.random.Random;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
@@ -55,21 +60,18 @@ public class GatewayHubBlock extends BlockWithEntity {
     }
     /*
     GRAPHICS CODE:
-    TODO render beam on teleport
-    TODO render skybox line
-    TODO render skybox circles
     TODO particles on teleport
     TODO screenshake and flash
 
     NON-GRAPHICS CODE:
-    TODO teleportation cost
     TODO fix teleporting outside pad
-    TODO automatically open/close on pad completed/destroyed
+    TODO exp bottle instafix
 
     OTHER:
     TODO sounds
     TODO recipes
     TODO resonance conduit model
+    TODO better cracked textures
 
     PRESENTATION:
     TODO testing
@@ -91,10 +93,16 @@ public class GatewayHubBlock extends BlockWithEntity {
     @Override
     public ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player, Hand hand, BlockHitResult hit) {
         if (!world.isClient()) {
-            if (!player.getActiveHand().equals(hand) || !player.getStackInHand(hand).isEmpty())
+            if (!player.getActiveHand().equals(hand))
                 return ActionResult.PASS;
 
-            return attemptTeleport(state, world, pos);
+            ItemStack handStack = player.getStackInHand(hand);
+
+            if(handStack.isEmpty()) {
+                ActionResult result = attemptTeleport(state, world, pos);
+
+
+            }
         }
         return ActionResult.PASS;
     }
@@ -231,6 +239,32 @@ public class GatewayHubBlock extends BlockWithEntity {
                         fromEntity.remove(Entity.RemovalReason.DISCARDED);
                     }
                 }));
+
+                Random rand = world.getRandom();
+                int sideLength = fromBox.getBlockCountX();
+                int padCount = (int) Math.pow(sideLength, 2);
+
+                int perHalf = sideLength / 2;
+
+                int countBroken = rand.nextBetween(padCount / 8, padCount / 4);
+
+                for(int j = 0; j < countBroken; j++) {
+                    int x = rand.nextBetweenExclusive(-perHalf, perHalf);
+                    int z = rand.nextBetweenExclusive(-perHalf, perHalf);
+
+                    if(x == 0 && z == 0) continue;
+
+                    BlockPos offsetPos = pos.add(x, 0, z);
+                    BlockState offsetState = world.getBlockState(offsetPos);
+                    Block offsetBlock = offsetState.getBlock();
+
+                    if(offsetBlock.equals(Blocks.AMETHYST_BLOCK)) {
+                        world.setBlockState(offsetPos, GatewaysBlocks.CRACKED_AMETHYST.getDefaultState());
+                    }
+                    else if(offsetBlock.equals(GatewaysBlocks.RESONANT_AMETHYST)) {
+                        world.setBlockState(offsetPos, GatewaysBlocks.CRACKED_RESONANT_AMETHYST.getDefaultState());
+                    }
+                }
             }
             return ActionResult.SUCCESS;
         }
