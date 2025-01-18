@@ -24,7 +24,7 @@ public class CrackedAmethystBlock extends AbstractCrackedBlock {
     }
 
     @Override
-    BlockState getFixedBlock() {
+    public BlockState getFixedBlock() {
         return Blocks.AMETHYST_BLOCK.getDefaultState();
     }
 }

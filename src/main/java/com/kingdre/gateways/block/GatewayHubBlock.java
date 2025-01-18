@@ -64,8 +64,7 @@ public class GatewayHubBlock extends BlockWithEntity {
     TODO screenshake and flash
 
     NON-GRAPHICS CODE:
-    TODO fix teleporting outside pad
-    TODO exp bottle instafix
+    done :D
 
     OTHER:
     TODO sounds
@@ -101,7 +100,7 @@ public class GatewayHubBlock extends BlockWithEntity {
             if(handStack.isEmpty()) {
                 ActionResult result = attemptTeleport(state, world, pos);
 
-
+                return result;
             }
         }
         return ActionResult.PASS;
@@ -147,11 +146,14 @@ public class GatewayHubBlock extends BlockWithEntity {
             MinecraftServer server = ((ServerWorld) world).getServer();
 
             boolean open = state.get(OPEN);
-            BlockBox fromBox = validateGatewayPad(state, world, pos, true, true);
-            if(fromBox == null) {
+            BlockBox fromBlockBox = validateGatewayPad(state, world, pos, true, true);
+            if(fromBlockBox == null) {
                 world.setBlockState(pos, state.with(OPEN, false));
                 return ActionResult.PASS;
             }
+
+            Box fromBox = Box.from(fromBlockBox);
+
 
             if (!open) {
                 world.setBlockState(pos, state.with(OPEN, true));
@@ -173,16 +175,18 @@ public class GatewayHubBlock extends BlockWithEntity {
             }
 
 
-            if (fromBox.intersects(toBox)) return ActionResult.PASS;
+            if (fromBlockBox.intersects(toBox)) return ActionResult.PASS;
 
 
-            if (fromBox.getBlockCountX() <= toBox.getBlockCountX()) {
+            if (fromBlockBox.getBlockCountX() <= toBox.getBlockCountX()) {
 
                 StructureTemplate template = new StructureTemplate();
+
+
                 template.saveFromWorld(
                         world,
-                        BlockPos.ofFloored(fromBox.getMinX(), fromBox.getMinY(), fromBox.getMinZ()),
-                        fromBox.getDimensions(),
+                        BlockPos.ofFloored(fromBlockBox.getMinX(), fromBlockBox.getMinY(), fromBlockBox.getMinZ()),
+                        fromBlockBox.getDimensions(),
                         true,
                         null
                 );
@@ -196,21 +200,26 @@ public class GatewayHubBlock extends BlockWithEntity {
                         Block.NOTIFY_ALL
                 );
 
+//                debug(world, fromBlockBox.getMinX() + " " + fromBlockBox.getMinY() + " " + fromBlockBox.getMinZ());
+//                debug(world, fromBlockBox.getMaxX() + " " + fromBlockBox.getMaxY() + " " + fromBlockBox.getMaxZ());
+
                 CuboidBlockIterator iterator = new CuboidBlockIterator(
-                        fromBox.getMinX(),
-                        fromBox.getMinY(),
-                        fromBox.getMinZ(),
-                        fromBox.getMaxX(),
-                        fromBox.getMaxY(),
-                        fromBox.getMaxZ()
+                        fromBlockBox.getMinX(),
+                        fromBlockBox.getMinY(),
+                        fromBlockBox.getMinZ(),
+                        fromBlockBox.getMaxX() - 1,
+                        fromBlockBox.getMaxY() - 1,
+                        fromBlockBox.getMaxZ() - 1
                 );
+
+//                debug(world, fromBox.minX + " " + fromBox.minY + " " + fromBox.minZ);
+//                debug(world, fromBox.maxX + " " + fromBox.maxY + " " + fromBox.maxZ);
 
                 int i = 0;
                 // putting the extra i here because i don't trust the block iterator enough
 
                 while (iterator.step()) {
                     if (i > Math.pow(MAX_PAD_SIDE_LENGTH, 2)) break; // just to be safe
-
                     BlockPos fromPos = BlockPos.ofFloored(iterator.getX(), iterator.getY(), iterator.getZ());
 
                     BlockEntity fromEntity = world.getBlockEntity(fromPos);
@@ -219,20 +228,18 @@ public class GatewayHubBlock extends BlockWithEntity {
                         fromEntity.markRemoved();
 
                     world.setBlockState(
-                            new BlockPos(
-                                    iterator.getX(),
-                                    iterator.getY(),
-                                    iterator.getZ()
-                            ),
+                            fromPos,
                             Blocks.AIR.getDefaultState()
                     );
+
+
                     i++;
                 }
 
                 Vec3d difference = new Vec3d(toBox.getMinX(), toBox.getMinY(), toBox.getMinZ())
-                        .subtract(fromBox.getMinX(), fromBox.getMinY(), fromBox.getMinZ());
+                        .subtract(fromBlockBox.getMinX(), fromBlockBox.getMinY(), fromBlockBox.getMinZ());
 
-                world.getEntitiesByType(TypeFilter.instanceOf(Entity.class), Box.from(fromBox).withMaxY(1000), o -> true).forEach((fromEntity -> {
+                world.getEntitiesByType(TypeFilter.instanceOf(Entity.class), fromBox, o -> true).forEach((fromEntity -> {
                     if (fromEntity.getType() == EntityType.PLAYER) {
                         fromEntity.requestTeleportOffset(difference.getX(), difference.getY(), difference.getZ());
                     } else {
@@ -241,9 +248,8 @@ public class GatewayHubBlock extends BlockWithEntity {
                 }));
 
                 Random rand = world.getRandom();
-                int sideLength = fromBox.getBlockCountX();
+                int sideLength = fromBlockBox.getBlockCountX() - 1;
                 int padCount = (int) Math.pow(sideLength, 2);
-
                 int perHalf = sideLength / 2;
 
                 int countBroken = rand.nextBetween(padCount / 8, padCount / 4);
@@ -251,6 +257,8 @@ public class GatewayHubBlock extends BlockWithEntity {
                 for(int j = 0; j < countBroken; j++) {
                     int x = rand.nextBetweenExclusive(-perHalf, perHalf);
                     int z = rand.nextBetweenExclusive(-perHalf, perHalf);
+
+                    debug(world, x + " " + z);
 
                     if(x == 0 && z == 0) continue;
 
@@ -352,11 +360,13 @@ public class GatewayHubBlock extends BlockWithEntity {
             if (box.getBlockCountX() < 3) return null;
 
 
-            for(int x = box.getMinX(); x < box.getMaxX() + 1; x++) {
-                for(int y = box.getMinY(); y < box.getMaxY() + 1; y++) {
-                    for(int z = box.getMinZ(); z < box.getMaxZ() + 1; z++) {
-                        if(!world.getBlockState(new BlockPos(x, y, z)).isAir()) {
-                            return null;
+            if(!allowCargo) {
+                for (int x = box.getMinX(); x < box.getMaxX(); x++) {
+                    for (int y = box.getMinY(); y < box.getMaxY(); y++) {
+                        for (int z = box.getMinZ(); z < box.getMaxZ(); z++) {
+                            if (!world.getBlockState(new BlockPos(x, y, z)).isAir()) {
+                                return null;
+                            }
                         }
                     }
                 }

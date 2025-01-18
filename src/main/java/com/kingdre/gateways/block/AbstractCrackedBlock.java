@@ -26,7 +26,7 @@ public abstract class AbstractCrackedBlock extends Block {
         super(settings);
     }
 
-    abstract BlockState getFixedBlock();
+    public abstract BlockState getFixedBlock();
 
     @Override
     public ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player, Hand hand, BlockHitResult hit) {

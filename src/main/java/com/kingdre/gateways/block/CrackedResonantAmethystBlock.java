@@ -9,7 +9,7 @@ public class CrackedResonantAmethystBlock extends AbstractCrackedBlock {
     }
 
     @Override
-    BlockState getFixedBlock() {
+    public BlockState getFixedBlock() {
         return GatewaysBlocks.RESONANT_AMETHYST.getDefaultState();
     }
 }

@@ -15,22 +15,45 @@ import net.minecraft.state.StateManager;
 import net.minecraft.state.property.BooleanProperty;
 import net.minecraft.state.property.DirectionProperty;
 import net.minecraft.state.property.Properties;
+import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
+import net.minecraft.util.ItemScatterer;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
+import net.minecraft.util.shape.VoxelShape;
+import net.minecraft.util.shape.VoxelShapes;
+import net.minecraft.world.BlockView;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 public class ResonanceConduitBlock extends BlockWithEntity {
     private static final BooleanProperty POWERED = Properties.POWERED;
+    private static final VoxelShape SHAPE = Block.createCuboidShape(4, 0, 4, 12, 16, 12);
+
 
     protected ResonanceConduitBlock() {
-        super(Settings.copy(Blocks.BLACKSTONE));
+        super(Settings.copy(Blocks.POLISHED_BLACKSTONE));
         this.setDefaultState(
                 this.stateManager.getDefaultState().with(POWERED, false)
         );
+    }
+
+    @Override
+    public void onStateReplaced(BlockState state, World world, BlockPos pos, BlockState newState, boolean moved) {
+        BlockEntity entity = world.getBlockEntity(pos);
+
+        if(!state.isOf(newState.getBlock()) && entity instanceof ResonanceConduitBlockEntity conduit && conduit.heldItem != null) {
+            ItemScatterer.spawn(world, pos.getX(), pos.getY(), pos.getZ(), conduit.heldItem);
+        }
+
+        super.onStateReplaced(state, world, pos, newState, moved);
+    }
+
+    @Override
+    public VoxelShape getOutlineShape(BlockState state, BlockView world, BlockPos pos, ShapeContext context) {
+        return SHAPE;
     }
 
     @Override
@@ -60,15 +83,17 @@ public class ResonanceConduitBlock extends BlockWithEntity {
             if(itemType.equals(GatewaysItems.TUNING_FORK)) {
                 conduitEntity.heldItem = item;
                 conduitEntity.markDirty();
+                world.updateListeners(pos, state, state, 0);
 
                 player.setStackInHand(hand, Items.AIR.getDefaultStack());
                 return ActionResult.SUCCESS;
             }
-            else if(itemType.equals(Items.AIR) && conduitEntity.heldItem != null) {
+            else if(itemType.equals(Items.AIR) && conduitEntity.heldItem != ItemStack.EMPTY) {
                 player.setStackInHand(hand, conduitEntity.heldItem);
 
-                conduitEntity.heldItem = null;
+                conduitEntity.heldItem = ItemStack.EMPTY;
                 conduitEntity.markDirty();
+                world.updateListeners(pos, state, state, 0);
                 return ActionResult.SUCCESS;
             }
         }
@@ -92,8 +117,10 @@ public class ResonanceConduitBlock extends BlockWithEntity {
 
                 ResonanceConduitBlockEntity conduitEntity = (ResonanceConduitBlockEntity) entity;
                 ItemStack item = conduitEntity.heldItem;
+                world.getPlayers().forEach((playerEntity -> playerEntity.sendMessage(Text.of("bbbb"))));
 
-                if(item != null) {
+                if(item != ItemStack.EMPTY) {
+                    world.getPlayers().forEach((playerEntity -> playerEntity.sendMessage(Text.of("aaaa"))));
                     TuningForkItem.giveFrequency(pos.down(), world, item.getOrCreateNbt());
                     world.setBlockState(pos, state.with(POWERED, true), Block.NO_REDRAW);
                 }
