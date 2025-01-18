@@ -69,7 +69,7 @@ public class GatewayHubBlock extends BlockWithEntity {
     OTHER:
     TODO sounds
     TODO recipes
-    TODO resonance conduit model
+    TODO better resonance conduit model
     TODO better cracked textures
 
     PRESENTATION:

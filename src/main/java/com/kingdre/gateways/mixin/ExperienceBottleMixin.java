@@ -73,7 +73,7 @@ public abstract class ExperienceBottleMixin extends Entity {
             int i = 0; // i dont just block iterators
 
             while(blockIterator.step()) {
-                if(i >= 1000) break;
+                if(i >= 1000) break; // to be safe
                 BlockPos pos = new BlockPos(
                         blockIterator.getX(),
                         blockIterator.getY(),

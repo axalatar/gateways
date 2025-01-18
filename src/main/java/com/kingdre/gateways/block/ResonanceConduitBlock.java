@@ -117,10 +117,8 @@ public class ResonanceConduitBlock extends BlockWithEntity {
 
                 ResonanceConduitBlockEntity conduitEntity = (ResonanceConduitBlockEntity) entity;
                 ItemStack item = conduitEntity.heldItem;
-                world.getPlayers().forEach((playerEntity -> playerEntity.sendMessage(Text.of("bbbb"))));
 
                 if(item != ItemStack.EMPTY) {
-                    world.getPlayers().forEach((playerEntity -> playerEntity.sendMessage(Text.of("aaaa"))));
                     TuningForkItem.giveFrequency(pos.down(), world, item.getOrCreateNbt());
                     world.setBlockState(pos, state.with(POWERED, true), Block.NO_REDRAW);
                 }
