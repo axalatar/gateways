@@ -15,6 +15,8 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.nbt.NbtCompound;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.CuboidBlockIterator;
 import net.minecraft.util.hit.HitResult;
@@ -89,6 +91,14 @@ public abstract class ExperienceBottleMixin extends Entity {
 
                 i++;
             }
+            this.getWorld().playSound(
+                    null,
+                    BlockPos.ofFloored(hitResult.getPos()),
+                    SoundEvents.BLOCK_AMETHYST_BLOCK_RESONATE,
+                    SoundCategory.BLOCKS,
+                    10f,
+                    1f
+            );
             this.discard();
             ci.cancel();
         }

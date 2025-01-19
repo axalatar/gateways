@@ -15,6 +15,8 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.item.SnowballItem;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvents;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
 import net.minecraft.util.hit.BlockHitResult;
@@ -38,6 +40,14 @@ public abstract class AbstractCrackedBlock extends Block {
             if(item.getItem().equals(Items.AMETHYST_SHARD)) {
                 world.setBlockState(pos, this.getFixedBlock());
                 item.decrement(1);
+                world.playSound(
+                        null,
+                        pos,
+                        SoundEvents.BLOCK_AMETHYST_BLOCK_RESONATE,
+                        SoundCategory.BLOCKS,
+                        50f,
+                        1f
+                );
                 return ActionResult.SUCCESS;
             }
         }
@@ -57,6 +67,15 @@ public abstract class AbstractCrackedBlock extends Block {
                 if(stack.getItem().equals(Items.AMETHYST_SHARD)) {
                     stack.decrement(1);
                     item.setStack(stack);
+
+                    world.playSound(
+                            null,
+                            pos,
+                            SoundEvents.BLOCK_AMETHYST_BLOCK_RESONATE,
+                            SoundCategory.BLOCKS,
+                            50f,
+                            1f
+                    );
 
                     world.setBlockState(pos, this.getFixedBlock());
                 }

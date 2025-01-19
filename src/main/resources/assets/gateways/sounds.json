@@ -1,0 +1,8 @@
+{
+  "gateway_teleport": {
+    "subtitle": "subtitles.gateways.gateway_teleport",
+    "sounds": [
+      "gateways:gateway_teleport"
+    ]
+  }
+}

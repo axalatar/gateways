@@ -11,6 +11,8 @@ import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvents;
 import net.minecraft.state.StateManager;
 import net.minecraft.state.property.BooleanProperty;
 import net.minecraft.state.property.DirectionProperty;
@@ -80,7 +82,8 @@ public class ResonanceConduitBlock extends BlockWithEntity {
             ResonanceConduitBlockEntity conduitEntity = (ResonanceConduitBlockEntity) entity;
 
             Item itemType = item.getItem();
-            if(itemType.equals(GatewaysItems.TUNING_FORK)) {
+            if(itemType.equals(GatewaysItems.TUNING_FORK) && conduitEntity.heldItem == ItemStack.EMPTY) {
+
                 conduitEntity.heldItem = item;
                 conduitEntity.markDirty();
                 world.updateListeners(pos, state, state, 0);
@@ -94,6 +97,7 @@ public class ResonanceConduitBlock extends BlockWithEntity {
                 conduitEntity.heldItem = ItemStack.EMPTY;
                 conduitEntity.markDirty();
                 world.updateListeners(pos, state, state, 0);
+
                 return ActionResult.SUCCESS;
             }
         }
@@ -108,7 +112,7 @@ public class ResonanceConduitBlock extends BlockWithEntity {
     public void neighborUpdate(BlockState state, World world, BlockPos pos, Block sourceBlock, BlockPos sourcePos, boolean notify) {
         if(world.isClient()) return;
 
-        boolean powered = world.isReceivingRedstonePower(pos);
+        boolean powered = world.getEmittedRedstonePower(pos.down(), Direction.DOWN) > 0;
         boolean alreadyPowered = state.get(POWERED);
         if (!alreadyPowered) {
             if (powered) {
@@ -121,6 +125,14 @@ public class ResonanceConduitBlock extends BlockWithEntity {
                 if(item != ItemStack.EMPTY) {
                     TuningForkItem.giveFrequency(pos.down(), world, item.getOrCreateNbt());
                     world.setBlockState(pos, state.with(POWERED, true), Block.NO_REDRAW);
+                    world.playSound(
+                            null,
+                            pos,
+                            SoundEvents.BLOCK_AMETHYST_BLOCK_CHIME,
+                            SoundCategory.BLOCKS,
+                            50f,
+                            1f
+                    );
                 }
             }
         }

@@ -1,5 +1,6 @@
 package com.kingdre.gateways.block;
 
+import com.kingdre.gateways.Gateways;
 import com.kingdre.gateways.block.entity.GatewayHubBlockEntity;
 import com.kingdre.gateways.block.entity.GatewaysBlockEntities;
 import net.minecraft.block.*;
@@ -18,6 +19,8 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.ServerTask;
 import net.minecraft.server.command.PlaceCommand;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvents;
 import net.minecraft.state.StateManager;
 import net.minecraft.state.property.BooleanProperty;
 import net.minecraft.state.property.DirectionProperty;
@@ -64,16 +67,14 @@ public class GatewayHubBlock extends BlockWithEntity {
     TODO screenshake and flash
 
     NON-GRAPHICS CODE:
-    done :D
+    actually done this time :D
 
     OTHER:
-    TODO sounds
-    TODO recipes
     TODO better resonance conduit model
     TODO better cracked textures
+    TODO fix function descriptions
 
     PRESENTATION:
-    TODO testing
     TODO video
      */
 
@@ -135,13 +136,18 @@ public class GatewayHubBlock extends BlockWithEntity {
         if (!world.isClient()) {
 
             BlockEntity entity = world.getBlockEntity(pos);
-            if (entity == null || !entity.getType().equals(GatewaysBlockEntities.GATEWAY_HUB_BLOCK_ENTITY))
+            if (entity == null || !entity.getType().equals(GatewaysBlockEntities.GATEWAY_HUB_BLOCK_ENTITY)) {
+                world.setBlockState(pos, state.with(OPEN, false));
                 return ActionResult.PASS;
+            }
 
             GatewayHubBlockEntity hubEntity = (GatewayHubBlockEntity) entity;
 
             List<Integer> frequency = hubEntity.heldFrequency;
-            if (frequency.isEmpty()) return ActionResult.PASS;
+            if (frequency.isEmpty()) {
+                world.setBlockState(pos, state.with(OPEN, false));
+                return ActionResult.PASS;
+            }
 
             MinecraftServer server = ((ServerWorld) world).getServer();
 
@@ -154,30 +160,33 @@ public class GatewayHubBlock extends BlockWithEntity {
 
             Box fromBox = Box.from(fromBlockBox);
 
-
-            if (!open) {
-                world.setBlockState(pos, state.with(OPEN, true));
-                return ActionResult.SUCCESS;
-            }
-
             BlockPos tunedTo = BlockPos.ofFloored(frequency.get(0), frequency.get(1), frequency.get(2));
             BlockEntity destinationEntity = world.getBlockEntity(tunedTo);
 
-            if (destinationEntity == null || !destinationEntity.getType().equals(GatewaysBlockEntities.GATEWAY_HUB_BLOCK_ENTITY))
+            if (destinationEntity == null || !destinationEntity.getType().equals(GatewaysBlockEntities.GATEWAY_HUB_BLOCK_ENTITY)) {
+                world.setBlockState(pos, state.with(OPEN, false));
                 return ActionResult.PASS;
+            }
 
 //            ((ServerWorld) world).getChunkManager().getChunk(0, 0)
 
             BlockBox toBox = validateGatewayPad(world.getBlockState(tunedTo), world, tunedTo, true, false);
 
             if(toBox == null) {
+                world.setBlockState(pos, state.with(OPEN, false));
                 return ActionResult.PASS;
             }
 
 
-            if (fromBlockBox.intersects(toBox)) return ActionResult.PASS;
+            if (fromBlockBox.intersects(toBox)) {
+                world.setBlockState(pos, state.with(OPEN, false));
+                return ActionResult.PASS;
+            }
 
-
+            if (!open) {
+                world.setBlockState(pos, state.with(OPEN, true));
+                return ActionResult.SUCCESS;
+            }
             if (fromBlockBox.getBlockCountX() <= toBox.getBlockCountX()) {
 
                 StructureTemplate template = new StructureTemplate();
@@ -274,6 +283,22 @@ public class GatewayHubBlock extends BlockWithEntity {
                     }
                 }
             }
+            world.playSound(
+                    null,
+                    pos,
+                    Gateways.GATEWAY_SOUND_EVENT,
+                    SoundCategory.BLOCKS,
+                    1f,
+                    1f
+            );
+            world.playSound(
+                    null,
+                    tunedTo,
+                    Gateways.GATEWAY_SOUND_EVENT,
+                    SoundCategory.BLOCKS,
+                    1f,
+                    1f
+            );
             return ActionResult.SUCCESS;
         }
         return ActionResult.PASS;

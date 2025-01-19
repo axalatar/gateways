@@ -1,15 +1,19 @@
 package com.kingdre.gateways.item;
 
+import com.kingdre.gateways.Gateways;
 import com.kingdre.gateways.block.GatewaysBlocks;
 import com.kingdre.gateways.block.entity.GatewayHubBlockEntity;
 import com.kingdre.gateways.block.entity.GatewaysBlockEntities;
 import net.minecraft.block.Block;
 import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.client.sound.SoundSystem;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.ItemUsageContext;
 import net.minecraft.nbt.NbtCompound;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Pair;
@@ -54,6 +58,15 @@ public class TuningForkItem extends Item {
                     // otherwise, give the frequency
                     giveFrequency(pos, world, nbt);
                 }
+                world.playSound(
+                        null,
+                        pos,
+                        SoundEvents.BLOCK_AMETHYST_BLOCK_CHIME,
+                        SoundCategory.BLOCKS,
+                        50f,
+                        1f
+                );
+
                 return ActionResult.SUCCESS;
             }
         }

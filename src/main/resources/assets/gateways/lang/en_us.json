@@ -6,5 +6,7 @@
   "block.gateways.cracked_amethyst": "Cracked Amethyst",
   "block.gateways.resonance_conduit": "Resonance Conduit",
 
+  "subtitles.gateways.gateway_teleport": "Gateway teleported",
+
   "itemgroup.gateways": "Gateways"
 }
