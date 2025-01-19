@@ -270,7 +270,6 @@ public class GatewayHubBlock extends BlockWithEntity {
                     int x = rand.nextBetweenExclusive(-perHalf, perHalf);
                     int z = rand.nextBetweenExclusive(-perHalf, perHalf);
 
-                    debug(world, x + " " + z);
 
                     if(x == 0 && z == 0) continue;
 
