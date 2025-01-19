@@ -1,6 +1,6 @@
 {
   "parent": "block/cube_all",
   "textures": {
-    "all": "gateways:block/cracked_amethyst"
+    "all": "gateways:block/cracked_amethyst_2"
   }
 }

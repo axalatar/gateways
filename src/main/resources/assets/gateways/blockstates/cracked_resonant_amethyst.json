@@ -1,0 +1,18 @@
+{
+  "variants": {
+    "": [
+      {
+        "model": "gateways:block/cracked_resonant_amethyst_1"
+      },
+      {
+        "model": "gateways:block/cracked_resonant_amethyst_2"
+      },
+      {
+        "model": "gateways:block/cracked_resonant_amethyst_3"
+      },
+      {
+        "model": "gateways:block/cracked_resonant_amethyst_4"
+      }
+    ]
+  }
+}

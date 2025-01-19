@@ -1,7 +1,18 @@
 {
   "variants": {
-    "": {
-      "model": "gateways:block/cracked_amethyst"
-    }
+    "": [
+      {
+        "model": "gateways:block/cracked_amethyst_1"
+      },
+      {
+        "model": "gateways:block/cracked_amethyst_2"
+      },
+      {
+        "model": "gateways:block/cracked_amethyst_3"
+      },
+      {
+        "model": "gateways:block/cracked_amethyst_4"
+      }
+    ]
   }
 }

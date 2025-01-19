@@ -79,6 +79,9 @@ public class TuningForkItem extends Item {
     }
 
 
+    /**
+     * Gets the frequency component from nbt, and uses it on the given hub or hub connected through resonant amethyst
+     */
     public static void giveFrequency(BlockPos pos, World world, NbtCompound nbt) {
 
         Block block = world.getBlockState(pos).getBlock();

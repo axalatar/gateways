@@ -3,10 +3,14 @@ package com.kingdre.gateways.block;
 import com.kingdre.gateways.Gateways;
 import com.kingdre.gateways.block.entity.GatewayHubBlockEntity;
 import com.kingdre.gateways.block.entity.GatewaysBlockEntities;
+import net.fabricmc.fabric.api.renderer.v1.RendererAccess;
 import net.minecraft.block.*;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.block.entity.SculkSpreadManager;
 import net.minecraft.block.enums.WallMountLocation;
+import net.minecraft.client.gl.PostEffectPass;
+import net.minecraft.client.gl.PostEffectProcessor;
+import net.minecraft.client.render.GameRenderer;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.ExperienceOrbEntity;
@@ -70,9 +74,7 @@ public class GatewayHubBlock extends BlockWithEntity {
     actually done this time :D
 
     OTHER:
-    TODO better resonance conduit model
-    TODO better cracked textures
-    TODO fix function descriptions
+    done :D
 
     PRESENTATION:
     TODO video
@@ -131,6 +133,7 @@ public class GatewayHubBlock extends BlockWithEntity {
 
     /**
      * Attempt to teleport blocks and entities from the gateway, validates the gateway before teleportation.
+     * Also updates the state of the hub. Returns whether the click was successful
      */
     public ActionResult attemptTeleport(BlockState state, World world, BlockPos pos) {
         if (!world.isClient()) {
@@ -152,7 +155,7 @@ public class GatewayHubBlock extends BlockWithEntity {
             MinecraftServer server = ((ServerWorld) world).getServer();
 
             boolean open = state.get(OPEN);
-            BlockBox fromBlockBox = validateGatewayPad(state, world, pos, true, true);
+            BlockBox fromBlockBox = validateGatewayPad(world, pos, true);
             if(fromBlockBox == null) {
                 world.setBlockState(pos, state.with(OPEN, false));
                 return ActionResult.PASS;
@@ -170,7 +173,7 @@ public class GatewayHubBlock extends BlockWithEntity {
 
 //            ((ServerWorld) world).getChunkManager().getChunk(0, 0)
 
-            BlockBox toBox = validateGatewayPad(world.getBlockState(tunedTo), world, tunedTo, true, false);
+            BlockBox toBox = validateGatewayPad(world, tunedTo, false);
 
             if(toBox == null) {
                 world.setBlockState(pos, state.with(OPEN, false));
@@ -305,11 +308,10 @@ public class GatewayHubBlock extends BlockWithEntity {
     }
 
     /**
-     * Finds the largest valid gateway pad for this block. Returns the side length of the teleport area, or null if none.
-     * If updateState is true, will update the blockstate of the hub depending on whether there's a valid pad.
-     * If allowCargo is true, it will allow a cube above the teleport pad where blocks can be placed. Otherwise, they will be treated as obstructive.
+     * Finds the largest valid gateway pad for this block. Returns the side box of the teleport area, or null if none.
+     * If allowCargo is true, it will allow a cube above the teleport pad where blocks can be placed. Otherwise, they will be treated as obstructive
      */
-    public BlockBox validateGatewayPad(BlockState state, World world, BlockPos pos, boolean updateState, boolean allowCargo) {
+    public BlockBox validateGatewayPad(World world, BlockPos pos, boolean allowCargo) {
 
         // 3 --> {-1, 0, 1}
         // 5 --> {-2, -1, 0, 1, 2}
