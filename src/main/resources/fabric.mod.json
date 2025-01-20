@@ -9,6 +9,7 @@
   "license": "All-Rights-Reserved",
   "icon": "assets/gateways/icon.png",
   "environment": "*",
+  "accessWidener" : "gateways.accesswidener",
   "entrypoints": {
     "fabric-datagen": [
       "com.kingdre.gateways.GatewaysDataGenerator"

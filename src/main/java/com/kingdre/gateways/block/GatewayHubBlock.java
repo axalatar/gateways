@@ -4,6 +4,8 @@ import com.kingdre.gateways.Gateways;
 import com.kingdre.gateways.block.entity.GatewayHubBlockEntity;
 import com.kingdre.gateways.block.entity.GatewaysBlockEntities;
 import net.fabricmc.fabric.api.renderer.v1.RendererAccess;
+import net.fabricmc.fabric.api.renderer.v1.material.MaterialFinder;
+import net.fabricmc.fabric.mixin.client.rendering.WorldRendererMixin;
 import net.minecraft.block.*;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.block.entity.SculkSpreadManager;
@@ -11,6 +13,7 @@ import net.minecraft.block.enums.WallMountLocation;
 import net.minecraft.client.gl.PostEffectPass;
 import net.minecraft.client.gl.PostEffectProcessor;
 import net.minecraft.client.render.GameRenderer;
+import net.minecraft.client.render.WorldRenderer;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.ExperienceOrbEntity;
@@ -113,6 +116,7 @@ public class GatewayHubBlock extends BlockWithEntity {
     @Override
     public void neighborUpdate(BlockState state, World world, BlockPos pos, Block sourceBlock, BlockPos sourcePos, boolean notify) {
         if (world.isClient()) return;
+
 
         boolean powered = world.isReceivingRedstonePower(pos);
         boolean alreadyPowered = state.get(POWERED);
