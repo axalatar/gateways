@@ -19,6 +19,7 @@ import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
+import net.minecraft.util.ItemActionResult;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
@@ -31,15 +32,14 @@ public abstract class AbstractCrackedBlock extends Block {
     public abstract BlockState getFixedBlock();
 
     @Override
-    public ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player, Hand hand, BlockHitResult hit) {
+    protected ItemActionResult onUseWithItem(ItemStack stack, BlockState state, World world, BlockPos pos, PlayerEntity player, Hand hand, BlockHitResult hit) {
         if (!world.isClient()) {
             if (!player.getActiveHand().equals(hand))
-                return ActionResult.PASS;
+                return ItemActionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
 
-            ItemStack item = player.getStackInHand(hand);
-            if(item.getItem().equals(Items.AMETHYST_SHARD)) {
+            if(stack.getItem().equals(Items.AMETHYST_SHARD)) {
                 world.setBlockState(pos, this.getFixedBlock());
-                item.decrement(1);
+                stack.decrement(1);
                 world.playSound(
                         null,
                         pos,
@@ -48,12 +48,12 @@ public abstract class AbstractCrackedBlock extends Block {
                         50f,
                         1f
                 );
-                return ActionResult.SUCCESS;
+                return ItemActionResult.SUCCESS;
             }
         }
 
 
-        return ActionResult.PASS;
+        return ItemActionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
     }
 
     @Override

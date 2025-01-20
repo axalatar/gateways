@@ -1,10 +1,12 @@
 package com.kingdre.gateways.block;
 
+import com.kingdre.gateways.GatewaysComponents;
 import com.kingdre.gateways.block.entity.GatewayHubBlockEntity;
 import com.kingdre.gateways.block.entity.GatewaysBlockEntities;
 import com.kingdre.gateways.block.entity.ResonanceConduitBlockEntity;
 import com.kingdre.gateways.item.GatewaysItems;
 import com.kingdre.gateways.item.TuningForkItem;
+import com.mojang.serialization.MapCodec;
 import net.minecraft.block.*;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.entity.player.PlayerEntity;
@@ -35,8 +37,8 @@ public class ResonanceConduitBlock extends BlockWithEntity {
     private static final VoxelShape SHAPE = Block.createCuboidShape(4, 0, 4, 12, 16, 12);
 
 
-    protected ResonanceConduitBlock() {
-        super(Settings.copy(Blocks.POLISHED_BLACKSTONE));
+    protected ResonanceConduitBlock(Settings settings) {
+        super(settings);
         this.setDefaultState(
                 this.stateManager.getDefaultState().with(POWERED, false)
         );
@@ -70,10 +72,10 @@ public class ResonanceConduitBlock extends BlockWithEntity {
     }
 
     @Override
-    public ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player, Hand hand, BlockHitResult hit) {
+    public ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player, BlockHitResult hit) {
         if (!world.isClient()) {
-            ItemStack item = player.getStackInHand(hand);
-            if (!player.getActiveHand().equals(hand))
+            Hand hand = player.getActiveHand();
+            if (!hand.equals(player.preferredHand))
                 return ActionResult.PASS;
 
             BlockEntity entity = world.getBlockEntity(pos);
@@ -81,6 +83,7 @@ public class ResonanceConduitBlock extends BlockWithEntity {
 
             ResonanceConduitBlockEntity conduitEntity = (ResonanceConduitBlockEntity) entity;
 
+            ItemStack item = player.getStackInHand(hand);
             Item itemType = item.getItem();
             if(itemType.equals(GatewaysItems.TUNING_FORK) && conduitEntity.heldItem == ItemStack.EMPTY) {
 
@@ -88,11 +91,11 @@ public class ResonanceConduitBlock extends BlockWithEntity {
                 conduitEntity.markDirty();
                 world.updateListeners(pos, state, state, 0);
 
-                player.setStackInHand(hand, Items.AIR.getDefaultStack());
+                player.setStackInHand(player.getActiveHand(), Items.AIR.getDefaultStack());
                 return ActionResult.SUCCESS;
             }
             else if(itemType.equals(Items.AIR) && conduitEntity.heldItem != ItemStack.EMPTY) {
-                player.setStackInHand(hand, conduitEntity.heldItem);
+                player.setStackInHand(player.getActiveHand(), conduitEntity.heldItem);
 
                 conduitEntity.heldItem = ItemStack.EMPTY;
                 conduitEntity.markDirty();
@@ -123,7 +126,7 @@ public class ResonanceConduitBlock extends BlockWithEntity {
                 ItemStack item = conduitEntity.heldItem;
 
                 if(item != ItemStack.EMPTY) {
-                    TuningForkItem.giveFrequency(pos.down(), world, item.getOrCreateNbt());
+                    TuningForkItem.giveFrequency(pos.down(), world, item.get(GatewaysComponents.FREQUENCY));
                     world.setBlockState(pos, state.with(POWERED, true), Block.NO_REDRAW);
                     world.playSound(
                             null,
@@ -137,6 +140,11 @@ public class ResonanceConduitBlock extends BlockWithEntity {
             }
         }
         else if (!powered) world.setBlockState(pos, state.with(POWERED, false));
+    }
+
+    @Override
+    protected MapCodec<? extends BlockWithEntity> getCodec() {
+        return createCodec(ResonanceConduitBlock::new);
     }
 
     @Override

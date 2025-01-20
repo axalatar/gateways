@@ -3,13 +3,13 @@ package com.kingdre.gateways.block;
 import com.kingdre.gateways.Gateways;
 import com.kingdre.gateways.block.entity.GatewayHubBlockEntity;
 import com.kingdre.gateways.block.entity.GatewaysBlockEntities;
+import com.mojang.serialization.MapCodec;
 import net.fabricmc.fabric.api.renderer.v1.RendererAccess;
 import net.fabricmc.fabric.api.renderer.v1.material.MaterialFinder;
 import net.fabricmc.fabric.mixin.client.rendering.WorldRendererMixin;
 import net.minecraft.block.*;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.block.entity.SculkSpreadManager;
-import net.minecraft.block.enums.WallMountLocation;
 import net.minecraft.client.gl.PostEffectPass;
 import net.minecraft.client.gl.PostEffectProcessor;
 import net.minecraft.client.render.GameRenderer;
@@ -61,8 +61,8 @@ public class GatewayHubBlock extends BlockWithEntity {
     // probably a good idea to have this
     // is there a better way to do a const in java?
 
-    protected GatewayHubBlock() {
-        super(Settings.copy(Blocks.AMETHYST_BLOCK).strength(10f));
+    protected GatewayHubBlock(Settings settings) {
+        super(settings);
         this.setDefaultState(
                 this.stateManager.getDefaultState().with(POWERED, false).with(FACING, Direction.NORTH).with(OPEN, false)
         );
@@ -96,9 +96,10 @@ public class GatewayHubBlock extends BlockWithEntity {
 
 
     @Override
-    public ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player, Hand hand, BlockHitResult hit) {
+    public ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player, BlockHitResult hit) {
         if (!world.isClient()) {
-            if (!player.getActiveHand().equals(hand))
+            Hand hand = player.getActiveHand();
+            if (!hand.equals(player.preferredHand))
                 return ActionResult.PASS;
 
             ItemStack handStack = player.getStackInHand(hand);
@@ -223,9 +224,9 @@ public class GatewayHubBlock extends BlockWithEntity {
                         fromBlockBox.getMinX(),
                         fromBlockBox.getMinY(),
                         fromBlockBox.getMinZ(),
-                        fromBlockBox.getMaxX() - 1,
-                        fromBlockBox.getMaxY() - 1,
-                        fromBlockBox.getMaxZ() - 1
+                        fromBlockBox.getMaxX(),
+                        fromBlockBox.getMaxY(),
+                        fromBlockBox.getMaxZ()
                 );
 
 //                debug(world, fromBox.minX + " " + fromBox.minY + " " + fromBox.minZ);
@@ -271,8 +272,9 @@ public class GatewayHubBlock extends BlockWithEntity {
                 int countBroken = rand.nextBetween(padCount / 8, padCount / 4);
 
                 for(int j = 0; j < countBroken; j++) {
-                    int x = rand.nextBetweenExclusive(-perHalf, perHalf);
-                    int z = rand.nextBetweenExclusive(-perHalf, perHalf);
+                    int x = rand.nextBetween(-perHalf, perHalf);
+                    int z = rand.nextBetween(-perHalf, perHalf);
+//                    debug(world, );
 
 
                     if(x == 0 && z == 0) continue;
@@ -404,6 +406,11 @@ public class GatewayHubBlock extends BlockWithEntity {
             return box;
     }
 
+
+    @Override
+    protected MapCodec<? extends BlockWithEntity> getCodec() {
+        return createCodec(GatewayHubBlock::new);
+    }
 
     @Override
     public BlockRenderType getRenderType(BlockState state) {

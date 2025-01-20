@@ -1,12 +1,16 @@
 package com.kingdre.gateways.item;
 
 import com.kingdre.gateways.Gateways;
+import com.kingdre.gateways.GatewaysComponents;
 import com.kingdre.gateways.block.GatewaysBlocks;
 import com.kingdre.gateways.block.entity.GatewayHubBlockEntity;
 import com.kingdre.gateways.block.entity.GatewaysBlockEntities;
 import net.minecraft.block.Block;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.client.sound.SoundSystem;
+import net.minecraft.component.ComponentMap;
+import net.minecraft.component.ComponentType;
+import net.minecraft.component.DataComponentTypes;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -24,6 +28,7 @@ import net.minecraft.world.World;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.IntStream;
 
 public class TuningForkItem extends Item {
 
@@ -44,19 +49,23 @@ public class TuningForkItem extends Item {
             World world = context.getWorld();
             Block block = world.getBlockState(pos).getBlock();
 
-            NbtCompound nbt = heldItem.getOrCreateNbt();
+//            ComponentMap components = heldItem.getComponents();
             if (block.equals(GatewaysBlocks.GATEWAY_HUB) || block.equals(GatewaysBlocks.RESONANT_AMETHYST)) {
 
                 if (player.isSneaking() && block.equals(GatewaysBlocks.GATEWAY_HUB)) {
                     // if the player is sneaking, take the frequency
-
-//                    player.sendMessage(Text.of(String.valueOf(pos.getX())));
-                    nbt.putIntArray("frequency", List.of(pos.getX(), pos.getY(), pos.getZ()));
-                    heldItem.setNbt(nbt);
+//                    heldItem.applyComponentsFrom(ComponentMap.);
+                    heldItem.set(GatewaysComponents.FREQUENCY, new GatewaysComponents.FrequencyComponent(
+                            pos.getX(),
+                            pos.getY(),
+                            pos.getZ()
+                    ));
 
                 } else {
                     // otherwise, give the frequency
-                    giveFrequency(pos, world, nbt);
+                    GatewaysComponents.FrequencyComponent frequency = heldItem.get(GatewaysComponents.FREQUENCY);
+                    if(frequency == null) return ActionResult.PASS;
+                    giveFrequency(pos, world, heldItem.get(GatewaysComponents.FREQUENCY));
                 }
                 world.playSound(
                         null,
@@ -75,15 +84,16 @@ public class TuningForkItem extends Item {
 
     @Override
     public boolean hasGlint(ItemStack stack) {
-        return stack.hasNbt();
+        return stack.contains(GatewaysComponents.FREQUENCY);
     }
 
 
     /**
      * Gets the frequency component from nbt, and uses it on the given hub or hub connected through resonant amethyst
      */
-    public static void giveFrequency(BlockPos pos, World world, NbtCompound nbt) {
+    public static void giveFrequency(BlockPos pos, World world, GatewaysComponents.FrequencyComponent frequencyComponent) {
 
+        if(frequencyComponent == null) return;
         Block block = world.getBlockState(pos).getBlock();
         if (block.equals(GatewaysBlocks.GATEWAY_HUB)) {
             BlockEntity entity = world.getBlockEntity(pos);
@@ -92,8 +102,7 @@ public class TuningForkItem extends Item {
 
             GatewayHubBlockEntity hubEntity = (GatewayHubBlockEntity) entity;
 
-            List<Integer> frequency = Arrays.stream(nbt.getIntArray("frequency")).boxed().toList();
-            if (frequency.isEmpty()) return;
+            List<Integer> frequency = List.of(frequencyComponent.x(), frequencyComponent.y(), frequencyComponent.z());
 
             BlockPos entityPos = hubEntity.getPos();
             if (
@@ -127,7 +136,7 @@ public class TuningForkItem extends Item {
                 }
             }
 
-            foundHubs.forEach(position -> giveFrequency(position, world, nbt));
+            foundHubs.forEach(position -> giveFrequency(position, world, frequencyComponent));
         }
     }
 }

@@ -23,14 +23,14 @@ public class GatewayHubBlockEntity extends BlockEntity {
     }
 
     @Override
-    public void writeNbt(NbtCompound nbt) {
+    public void writeNbt(NbtCompound nbt, RegistryWrapper.WrapperLookup wrapperLookup) {
         nbt.putIntArray("heldFrequency", this.heldFrequency);
-        super.writeNbt(nbt);
+        super.writeNbt(nbt, wrapperLookup);
     }
 
     @Override
-    public void readNbt(NbtCompound nbt) {
-        super.readNbt(nbt);
+    public void readNbt(NbtCompound nbt, RegistryWrapper.WrapperLookup wrapperLookup) {
+        super.readNbt(nbt, wrapperLookup);
         this.heldFrequency = Arrays.stream(nbt.getIntArray("heldFrequency")).boxed().toList();
     }
 
@@ -40,7 +40,7 @@ public class GatewayHubBlockEntity extends BlockEntity {
     }
 
     @Override
-    public NbtCompound toInitialChunkDataNbt() {
-        return createNbt();
+    public NbtCompound toInitialChunkDataNbt(RegistryWrapper.WrapperLookup wrapperLookup) {
+        return createNbt(wrapperLookup);
     }
 }

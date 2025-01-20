@@ -9,8 +9,8 @@ import net.minecraft.registry.Registry;
 import net.minecraft.util.Identifier;
 
 public class GatewaysBlocks {
-    public static final Block GATEWAY_HUB = registerBlock("gateway_hub", new GatewayHubBlock());
-    public static final Block RESONANCE_CONDUIT = registerBlock("resonance_conduit", new ResonanceConduitBlock());
+    public static final Block GATEWAY_HUB = registerBlock("gateway_hub", new GatewayHubBlock(AbstractBlock.Settings.copy(Blocks.AMETHYST_BLOCK).strength(10f)));
+    public static final Block RESONANCE_CONDUIT = registerBlock("resonance_conduit", new ResonanceConduitBlock(AbstractBlock.Settings.copy(Blocks.POLISHED_BLACKSTONE)));
 
     public static final Block RESONANT_AMETHYST = registerBlock("resonant_amethyst", new Block(AbstractBlock.Settings.copy(Blocks.AMETHYST_BLOCK)));
 
