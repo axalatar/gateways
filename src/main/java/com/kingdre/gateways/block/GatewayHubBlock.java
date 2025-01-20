@@ -1,6 +1,7 @@
 package com.kingdre.gateways.block;
 
 import com.kingdre.gateways.Gateways;
+import com.kingdre.gateways.GatewaysParticles;
 import com.kingdre.gateways.block.entity.GatewayHubBlockEntity;
 import com.kingdre.gateways.block.entity.GatewaysBlockEntities;
 import com.kingdre.gateways.client.GatewaysClient;
@@ -23,6 +24,7 @@ import net.minecraft.item.ItemPlacementContext;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.nbt.NbtCompound;
+import net.minecraft.particle.EntityEffectParticleEffect;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.ServerTask;
 import net.minecraft.server.command.PlaceCommand;
@@ -108,13 +110,9 @@ public class GatewayHubBlock extends BlockWithEntity {
             if(handStack.isEmpty()) {
                 ActionResult result = attemptTeleport(state, world, pos);
 
-
-
                 return result;
             }
         }
-        GatewaysClient.tick = 0;
-        GatewaysClient.pos = pos;
         return ActionResult.PASS;
     }
 
@@ -325,6 +323,11 @@ public class GatewayHubBlock extends BlockWithEntity {
                     1f,
                     1f
             );
+
+            BlockPos fromUp = pos.up();
+            BlockPos toUp = tunedTo.up();
+
+
             return ActionResult.SUCCESS;
         }
         return ActionResult.PASS;

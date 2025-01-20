@@ -33,6 +33,7 @@ public class Gateways implements ModInitializer {
         Registry.register(Registries.SOUND_EVENT, GATEWAY_SOUND_ID, GATEWAY_SOUND_EVENT);
 
         GatewaysComponents.registerComponents();
+        GatewaysParticles.registerParticles();
         GatewaysItemGroups.registerItemGroups();
         GatewaysBlockEntities.registerBlockEntities();
         GatewaysBlocks.registerBlocks();
