@@ -3,6 +3,7 @@ package com.kingdre.gateways.block;
 import com.kingdre.gateways.Gateways;
 import com.kingdre.gateways.block.entity.GatewayHubBlockEntity;
 import com.kingdre.gateways.block.entity.GatewaysBlockEntities;
+import com.kingdre.gateways.client.GatewaysClient;
 import com.mojang.serialization.MapCodec;
 import net.fabricmc.fabric.api.renderer.v1.RendererAccess;
 import net.fabricmc.fabric.api.renderer.v1.material.MaterialFinder;
@@ -107,9 +108,13 @@ public class GatewayHubBlock extends BlockWithEntity {
             if(handStack.isEmpty()) {
                 ActionResult result = attemptTeleport(state, world, pos);
 
+
+
                 return result;
             }
         }
+        GatewaysClient.tick = 0;
+        GatewaysClient.pos = pos;
         return ActionResult.PASS;
     }
 
@@ -227,8 +232,8 @@ public class GatewayHubBlock extends BlockWithEntity {
                         Block.NOTIFY_ALL
                 );
 
-                debug(world, fromBlockBox.getMinX() + " " + fromBlockBox.getMinY() + " " + fromBlockBox.getMinZ());
-                debug(world, fromBlockBox.getMaxX() + " " + fromBlockBox.getMaxY() + " " + fromBlockBox.getMaxZ());
+//                debug(world, fromBlockBox.getMinX() + " " + fromBlockBox.getMinY() + " " + fromBlockBox.getMinZ());
+//                debug(world, fromBlockBox.getMaxX() + " " + fromBlockBox.getMaxY() + " " + fromBlockBox.getMaxZ());
 
                 CuboidBlockIterator iterator = new CuboidBlockIterator(
                         fromBlockBox.getMinX(),
