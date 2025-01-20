@@ -191,14 +191,24 @@ public class GatewayHubBlock extends BlockWithEntity {
                 return ActionResult.PASS;
             }
 
+            if(fromBlockBox.getBlockCountX() > toBox.getBlockCountX()) {
+                world.setBlockState(pos, state.with(OPEN, false));
+                return ActionResult.PASS;
+            }
+
             if (!open) {
                 world.setBlockState(pos, state.with(OPEN, true));
                 return ActionResult.SUCCESS;
             }
+
             if (fromBlockBox.getBlockCountX() <= toBox.getBlockCountX()) {
 
                 StructureTemplate template = new StructureTemplate();
 
+                Vec3d difference = new Vec3d(toBox.getMinX(), toBox.getMinY(), toBox.getMinZ())
+                        .subtract(fromBlockBox.getMinX(), fromBlockBox.getMinY(), fromBlockBox.getMinZ());
+
+                BlockBox centeredToBox = fromBlockBox.offset((int) difference.x, (int) difference.y, (int) difference.z);
 
                 template.saveFromWorld(
                         world,
@@ -210,23 +220,23 @@ public class GatewayHubBlock extends BlockWithEntity {
 
                 template.place(
                         (ServerWorld) world,
-                        BlockPos.ofFloored(toBox.getMinX(), toBox.getMinY(), toBox.getMinZ()),
+                        BlockPos.ofFloored(centeredToBox.getMinX(), centeredToBox.getMinY(), centeredToBox.getMinZ()),
                         BlockPos.ofFloored(toBox.getMinX(), toBox.getMinY(), toBox.getMinZ()),
                         new StructurePlacementData(),
                         world.getRandom(),
                         Block.NOTIFY_ALL
                 );
 
-//                debug(world, fromBlockBox.getMinX() + " " + fromBlockBox.getMinY() + " " + fromBlockBox.getMinZ());
-//                debug(world, fromBlockBox.getMaxX() + " " + fromBlockBox.getMaxY() + " " + fromBlockBox.getMaxZ());
+                debug(world, fromBlockBox.getMinX() + " " + fromBlockBox.getMinY() + " " + fromBlockBox.getMinZ());
+                debug(world, fromBlockBox.getMaxX() + " " + fromBlockBox.getMaxY() + " " + fromBlockBox.getMaxZ());
 
                 CuboidBlockIterator iterator = new CuboidBlockIterator(
                         fromBlockBox.getMinX(),
                         fromBlockBox.getMinY(),
                         fromBlockBox.getMinZ(),
-                        fromBlockBox.getMaxX(),
-                        fromBlockBox.getMaxY(),
-                        fromBlockBox.getMaxZ()
+                        fromBlockBox.getMaxX() - 1,
+                        fromBlockBox.getMaxY() - 1,
+                        fromBlockBox.getMaxZ() - 1
                 );
 
 //                debug(world, fromBox.minX + " " + fromBox.minY + " " + fromBox.minZ);
@@ -236,7 +246,7 @@ public class GatewayHubBlock extends BlockWithEntity {
                 // putting the extra i here because i don't trust the block iterator enough
 
                 while (iterator.step()) {
-                    if (i > Math.pow(MAX_PAD_SIDE_LENGTH, 2)) break; // just to be safe
+                    if (i > Math.pow(MAX_PAD_SIDE_LENGTH, 3)) break; // just to be safe
                     BlockPos fromPos = BlockPos.ofFloored(iterator.getX(), iterator.getY(), iterator.getZ());
 
                     BlockEntity fromEntity = world.getBlockEntity(fromPos);
@@ -253,10 +263,13 @@ public class GatewayHubBlock extends BlockWithEntity {
                     i++;
                 }
 
-                Vec3d difference = new Vec3d(toBox.getMinX(), toBox.getMinY(), toBox.getMinZ())
-                        .subtract(fromBlockBox.getMinX(), fromBlockBox.getMinY(), fromBlockBox.getMinZ());
 
-                world.getEntitiesByType(TypeFilter.instanceOf(Entity.class), fromBox, o -> true).forEach((fromEntity -> {
+
+                world.getEntitiesByType(TypeFilter.instanceOf(Entity.class), fromBox
+                        .withMaxX(fromBox.maxX-1)
+                        .withMaxY(fromBox.maxY-1)
+                        .withMaxZ(fromBox.maxZ-1),
+                        o -> true).forEach((fromEntity -> {
                     if (fromEntity.getType() == EntityType.PLAYER) {
                         fromEntity.requestTeleportOffset(difference.getX(), difference.getY(), difference.getZ());
                     } else {
