@@ -158,6 +158,7 @@ public class GatewayHubBlock extends BlockWithEntity {
             }
 
             Box fromBox = Box.from(fromBlockBox);
+            debug(world, String.valueOf(fromBlockBox));
 
             BlockPos tunedTo = BlockPos.ofFloored(frequency.get(0), frequency.get(1), frequency.get(2));
             BlockEntity destinationEntity = world.getBlockEntity(tunedTo);
@@ -254,7 +255,6 @@ public class GatewayHubBlock extends BlockWithEntity {
             }
 
             List<ServerPlayerEntity> checked = new ArrayList<>();
-
 
             world.getEntitiesByType(TypeFilter.instanceOf(Entity.class), fromBox
                             .withMaxX(fromBox.maxX - 1)
@@ -424,13 +424,14 @@ public class GatewayHubBlock extends BlockWithEntity {
             Vec3d corner1 = center.add(-sideLength / 2., 1, -sideLength / 2.);
             Vec3d corner2 = center.add(sideLength / 2., sideLength + 1, sideLength / 2.);
 
+//            debug(corner1)
             BlockBox box = new BlockBox(
-                    (int) corner1.x,
-                    (int) corner1.y,
-                    (int) corner1.z,
-                    (int) corner2.x,
-                    (int) corner2.y,
-                    (int) corner2.z
+                    (int) Math.floor(corner1.x),
+                    (int) Math.floor(corner1.y),
+                    (int) Math.floor(corner1.z),
+                    (int) Math.floor(corner2.x),
+                    (int) Math.floor(corner2.y),
+                    (int) Math.floor(corner2.z)
             );
 
             if (box.getBlockCountX() < 3) return null;
