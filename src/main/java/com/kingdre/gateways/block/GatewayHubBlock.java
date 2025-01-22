@@ -158,7 +158,7 @@ public class GatewayHubBlock extends BlockWithEntity {
             }
 
             Box fromBox = Box.from(fromBlockBox);
-            debug(world, String.valueOf(fromBlockBox));
+          //  debug(world, String.valueOf(fromBlockBox));
 
             BlockPos tunedTo = BlockPos.ofFloored(frequency.get(0), frequency.get(1), frequency.get(2));
             BlockEntity destinationEntity = world.getBlockEntity(tunedTo);
