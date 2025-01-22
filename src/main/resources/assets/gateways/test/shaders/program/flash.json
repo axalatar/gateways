@@ -1,0 +1,10 @@
+{
+  "fragment": "gateways:flash",
+  "vertex": "gateways:generic",
+  "textures": {
+    "framebuffer": {
+      "type": "framebuffer",
+      "name": "veil:first_person"
+    }
+  }
+}

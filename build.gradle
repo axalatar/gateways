@@ -31,6 +31,7 @@ dependencies {
 
     modImplementation("foundry.veil:veil-fabric-${project.minecraft_version}:${project.veil_version}") {
         exclude group: "maven.modrinth"
+//        transitive = false
     }
     include("foundry.veil:veil-fabric-${project.minecraft_version}:${project.veil_version}")
 

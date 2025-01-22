@@ -1,36 +1,25 @@
 package com.kingdre.gateways.block;
 
 import com.kingdre.gateways.Gateways;
-import com.kingdre.gateways.GatewaysParticles;
+import com.kingdre.gateways.GatewaysNetworking;
 import com.kingdre.gateways.block.entity.GatewayHubBlockEntity;
 import com.kingdre.gateways.block.entity.GatewaysBlockEntities;
-import com.kingdre.gateways.client.GatewaysClient;
 import com.mojang.serialization.MapCodec;
-import net.fabricmc.fabric.api.renderer.v1.RendererAccess;
-import net.fabricmc.fabric.api.renderer.v1.material.MaterialFinder;
-import net.fabricmc.fabric.mixin.client.rendering.WorldRendererMixin;
+import foundry.veil.api.client.registry.PostPipelineStageRegistry;
+import net.fabricmc.fabric.api.networking.v1.PlayerLookup;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.block.*;
 import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.block.entity.SculkSpreadManager;
-import net.minecraft.client.gl.PostEffectPass;
-import net.minecraft.client.gl.PostEffectProcessor;
-import net.minecraft.client.render.GameRenderer;
-import net.minecraft.client.render.WorldRenderer;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
-import net.minecraft.entity.ExperienceOrbEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemPlacementContext;
 import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.particle.EntityEffectParticleEffect;
+import net.minecraft.particle.ParticleTypes;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.ServerTask;
-import net.minecraft.server.command.PlaceCommand;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
-import net.minecraft.sound.SoundEvents;
 import net.minecraft.state.StateManager;
 import net.minecraft.state.property.BooleanProperty;
 import net.minecraft.state.property.DirectionProperty;
@@ -50,7 +39,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
 public class GatewayHubBlock extends BlockWithEntity {
@@ -164,7 +152,7 @@ public class GatewayHubBlock extends BlockWithEntity {
 
             boolean open = state.get(OPEN);
             BlockBox fromBlockBox = validateGatewayPad(world, pos, true);
-            if(fromBlockBox == null) {
+            if (fromBlockBox == null) {
                 world.setBlockState(pos, state.with(OPEN, false));
                 return ActionResult.PASS;
             }
@@ -183,7 +171,7 @@ public class GatewayHubBlock extends BlockWithEntity {
 
             BlockBox toBox = validateGatewayPad(world, tunedTo, false);
 
-            if(toBox == null) {
+            if (toBox == null) {
                 world.setBlockState(pos, state.with(OPEN, false));
                 return ActionResult.PASS;
             }
@@ -194,7 +182,7 @@ public class GatewayHubBlock extends BlockWithEntity {
                 return ActionResult.PASS;
             }
 
-            if(fromBlockBox.getBlockCountX() > toBox.getBlockCountX()) {
+            if (fromBlockBox.getBlockCountX() > toBox.getBlockCountX()) {
                 world.setBlockState(pos, state.with(OPEN, false));
                 return ActionResult.PASS;
             }
@@ -204,108 +192,115 @@ public class GatewayHubBlock extends BlockWithEntity {
                 return ActionResult.SUCCESS;
             }
 
-            if (fromBlockBox.getBlockCountX() <= toBox.getBlockCountX()) {
 
-                StructureTemplate template = new StructureTemplate();
+            StructureTemplate template = new StructureTemplate();
 
-                Vec3d difference = new Vec3d(toBox.getMinX(), toBox.getMinY(), toBox.getMinZ())
-                        .subtract(fromBlockBox.getMinX(), fromBlockBox.getMinY(), fromBlockBox.getMinZ());
+            Vec3d difference = new Vec3d(toBox.getMinX(), toBox.getMinY(), toBox.getMinZ())
+                    .subtract(fromBlockBox.getMinX(), fromBlockBox.getMinY(), fromBlockBox.getMinZ());
 
-                BlockBox centeredToBox = fromBlockBox.offset((int) difference.x, (int) difference.y, (int) difference.z);
+            BlockBox centeredToBox = fromBlockBox.offset((int) difference.x, (int) difference.y, (int) difference.z);
 
-                template.saveFromWorld(
-                        world,
-                        BlockPos.ofFloored(fromBlockBox.getMinX(), fromBlockBox.getMinY(), fromBlockBox.getMinZ()),
-                        fromBlockBox.getDimensions(),
-                        true,
-                        null
-                );
+            template.saveFromWorld(
+                    world,
+                    BlockPos.ofFloored(fromBlockBox.getMinX(), fromBlockBox.getMinY(), fromBlockBox.getMinZ()),
+                    fromBlockBox.getDimensions(),
+                    true,
+                    null
+            );
 
-                template.place(
-                        (ServerWorld) world,
-                        BlockPos.ofFloored(centeredToBox.getMinX(), centeredToBox.getMinY(), centeredToBox.getMinZ()),
-                        BlockPos.ofFloored(toBox.getMinX(), toBox.getMinY(), toBox.getMinZ()),
-                        new StructurePlacementData(),
-                        world.getRandom(),
-                        Block.NOTIFY_ALL
-                );
+            template.place(
+                    (ServerWorld) world,
+                    BlockPos.ofFloored(centeredToBox.getMinX(), centeredToBox.getMinY(), centeredToBox.getMinZ()),
+                    BlockPos.ofFloored(toBox.getMinX(), toBox.getMinY(), toBox.getMinZ()),
+                    new StructurePlacementData(),
+                    world.getRandom(),
+                    Block.NOTIFY_ALL
+            );
 
 //                debug(world, fromBlockBox.getMinX() + " " + fromBlockBox.getMinY() + " " + fromBlockBox.getMinZ());
 //                debug(world, fromBlockBox.getMaxX() + " " + fromBlockBox.getMaxY() + " " + fromBlockBox.getMaxZ());
 
-                CuboidBlockIterator iterator = new CuboidBlockIterator(
-                        fromBlockBox.getMinX(),
-                        fromBlockBox.getMinY(),
-                        fromBlockBox.getMinZ(),
-                        fromBlockBox.getMaxX() - 1,
-                        fromBlockBox.getMaxY() - 1,
-                        fromBlockBox.getMaxZ() - 1
-                );
+            CuboidBlockIterator iterator = new CuboidBlockIterator(
+                    fromBlockBox.getMinX(),
+                    fromBlockBox.getMinY(),
+                    fromBlockBox.getMinZ(),
+                    fromBlockBox.getMaxX() - 1,
+                    fromBlockBox.getMaxY() - 1,
+                    fromBlockBox.getMaxZ() - 1
+            );
 
 //                debug(world, fromBox.minX + " " + fromBox.minY + " " + fromBox.minZ);
 //                debug(world, fromBox.maxX + " " + fromBox.maxY + " " + fromBox.maxZ);
 
-                int i = 0;
-                // putting the extra i here because i don't trust the block iterator enough
+            int i = 0;
+            // putting the extra i here because i don't trust the block iterator enough
 
-                while (iterator.step()) {
-                    if (i > Math.pow(MAX_PAD_SIDE_LENGTH, 3)) break; // just to be safe
-                    BlockPos fromPos = BlockPos.ofFloored(iterator.getX(), iterator.getY(), iterator.getZ());
+            while (iterator.step()) {
+                if (i > Math.pow(MAX_PAD_SIDE_LENGTH, 3)) break; // just to be safe
+                BlockPos fromPos = BlockPos.ofFloored(iterator.getX(), iterator.getY(), iterator.getZ());
 
-                    BlockEntity fromEntity = world.getBlockEntity(fromPos);
+                BlockEntity fromEntity = world.getBlockEntity(fromPos);
 
-                    if (fromEntity != null)
-                        fromEntity.markRemoved();
+                if (fromEntity != null)
+                    fromEntity.markRemoved();
 
-                    world.setBlockState(
-                            fromPos,
-                            Blocks.AIR.getDefaultState()
-                    );
+                world.setBlockState(
+                        fromPos,
+                        Blocks.AIR.getDefaultState()
+                );
 
 
-                    i++;
+                i++;
+            }
+
+            List<ServerPlayerEntity> checked = new ArrayList<>();
+
+
+            world.getEntitiesByType(TypeFilter.instanceOf(Entity.class), fromBox
+                            .withMaxX(fromBox.maxX - 1)
+                            .withMaxY(fromBox.maxY - 1)
+                            .withMaxZ(fromBox.maxZ - 1),
+                    o -> true).forEach((fromEntity -> {
+                if (fromEntity.getType() == EntityType.PLAYER) {
+                    ServerPlayerEntity player = (ServerPlayerEntity) fromEntity;
+
+                    player.requestTeleportOffset(difference.getX(), difference.getY(), difference.getZ());
+                    BlockPos fromUp = pos.up();
+                    BlockPos toUp = tunedTo.up();
+
+                    ServerPlayNetworking.send(player, new GatewaysNetworking.FlashPayload(fromUp));
+                    ServerPlayNetworking.send(player, new GatewaysNetworking.FlashPayload(toUp));
+                    checked.add(player);
+                } else {
+                    fromEntity.remove(Entity.RemovalReason.DISCARDED);
                 }
+            }));
 
+            Random rand = world.getRandom();
+            int sideLength = fromBlockBox.getBlockCountX() - 1;
+            int padCount = (int) Math.pow(sideLength, 2);
+            int perHalf = sideLength / 2;
 
+            int countBroken = rand.nextBetween(padCount / 8, padCount / 4);
 
-                world.getEntitiesByType(TypeFilter.instanceOf(Entity.class), fromBox
-                        .withMaxX(fromBox.maxX-1)
-                        .withMaxY(fromBox.maxY-1)
-                        .withMaxZ(fromBox.maxZ-1),
-                        o -> true).forEach((fromEntity -> {
-                    if (fromEntity.getType() == EntityType.PLAYER) {
-                        fromEntity.requestTeleportOffset(difference.getX(), difference.getY(), difference.getZ());
-                    } else {
-                        fromEntity.remove(Entity.RemovalReason.DISCARDED);
-                    }
-                }));
-
-                Random rand = world.getRandom();
-                int sideLength = fromBlockBox.getBlockCountX() - 1;
-                int padCount = (int) Math.pow(sideLength, 2);
-                int perHalf = sideLength / 2;
-
-                int countBroken = rand.nextBetween(padCount / 8, padCount / 4);
-
-                for(int j = 0; j < countBroken; j++) {
-                    int x = rand.nextBetween(-perHalf, perHalf);
-                    int z = rand.nextBetween(-perHalf, perHalf);
+            for (int j = 0; j < countBroken; j++) {
+                int x = rand.nextBetween(-perHalf, perHalf);
+                int z = rand.nextBetween(-perHalf, perHalf);
 //                    debug(world, );
 
 
-                    if(x == 0 && z == 0) continue;
+                if (x == 0 && z == 0) continue;
 
-                    BlockPos offsetPos = pos.add(x, 0, z);
-                    BlockState offsetState = world.getBlockState(offsetPos);
-                    Block offsetBlock = offsetState.getBlock();
+                BlockPos offsetPos = pos.add(x, 0, z);
+                BlockState offsetState = world.getBlockState(offsetPos);
+                Block offsetBlock = offsetState.getBlock();
 
-                    if(offsetBlock.equals(Blocks.AMETHYST_BLOCK)) {
-                        world.setBlockState(offsetPos, GatewaysBlocks.CRACKED_AMETHYST.getDefaultState());
-                    }
-                    else if(offsetBlock.equals(GatewaysBlocks.RESONANT_AMETHYST)) {
-                        world.setBlockState(offsetPos, GatewaysBlocks.CRACKED_RESONANT_AMETHYST.getDefaultState());
-                    }
+                if (offsetBlock.equals(Blocks.AMETHYST_BLOCK)) {
+                    world.setBlockState(offsetPos, GatewaysBlocks.CRACKED_AMETHYST.getDefaultState());
+                } else if (offsetBlock.equals(GatewaysBlocks.RESONANT_AMETHYST)) {
+                    world.setBlockState(offsetPos, GatewaysBlocks.CRACKED_RESONANT_AMETHYST.getDefaultState());
                 }
+
             }
             world.playSound(
                     null,
@@ -327,7 +322,34 @@ public class GatewayHubBlock extends BlockWithEntity {
             BlockPos fromUp = pos.up();
             BlockPos toUp = tunedTo.up();
 
+            ServerWorld serverWorld = (ServerWorld) world;
 
+            for (BlockPos currentPos : List.of(fromUp, toUp)) {
+                for(int j = 0; j < 5; j++) {
+                    BlockPos newPos = currentPos.add(
+                            rand.nextBetween(-perHalf, perHalf + 1),
+                            rand.nextBetween(1, sideLength),
+                            rand.nextBetween(-perHalf, perHalf + 1)
+                    );
+
+                    serverWorld.spawnParticles(
+                            ParticleTypes.CAMPFIRE_SIGNAL_SMOKE,
+                            newPos.getX() + rand.nextDouble() - 0.5,
+                            newPos.getY() + rand.nextDouble() - 0.5,
+                            newPos.getZ() + rand.nextDouble() - 0.5,
+                            1,
+                            0,
+                            0,
+                            0,
+                            0
+                    );
+                }
+
+                for (ServerPlayerEntity player : PlayerLookup.tracking((ServerWorld) world, currentPos)) {
+                    if(checked.contains(player)) continue;
+                    ServerPlayNetworking.send(player, new GatewaysNetworking.FlashPayload(currentPos));
+                }
+            }
             return ActionResult.SUCCESS;
         }
         return ActionResult.PASS;
@@ -338,6 +360,7 @@ public class GatewayHubBlock extends BlockWithEntity {
      * If allowCargo is true, it will allow a cube above the teleport pad where blocks can be placed. Otherwise, they will be treated as obstructive
      */
     public BlockBox validateGatewayPad(World world, BlockPos pos, boolean allowCargo) {
+
 
         // 3 --> {-1, 0, 1}
         // 5 --> {-2, -1, 0, 1, 2}
