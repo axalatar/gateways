@@ -13,6 +13,8 @@ import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.entity.vehicle.ChestMinecartEntity;
+import net.minecraft.entity.vehicle.MinecartEntity;
 import net.minecraft.item.ItemPlacementContext;
 import net.minecraft.item.ItemStack;
 import net.minecraft.particle.ParticleTypes;
@@ -27,10 +29,7 @@ import net.minecraft.state.property.Properties;
 import net.minecraft.structure.StructurePlacementData;
 import net.minecraft.structure.StructureTemplate;
 import net.minecraft.text.Text;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.CuboidBlockIterator;
-import net.minecraft.util.Hand;
-import net.minecraft.util.TypeFilter;
+import net.minecraft.util.*;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.*;
 import net.minecraft.util.math.random.Random;
@@ -272,7 +271,7 @@ public class GatewayHubBlock extends BlockWithEntity {
                     ServerPlayNetworking.send(player, new GatewaysNetworking.FlashPayload(toUp));
                     checked.add(player);
                 } else {
-                    fromEntity.remove(Entity.RemovalReason.DISCARDED);
+                    fromEntity.setRemoved(Entity.RemovalReason.DISCARDED);
                 }
             }));
 

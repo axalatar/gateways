@@ -7,7 +7,7 @@
   "authors": [],
   "contact": {},
   "license": "All-Rights-Reserved",
-  "icon": "assets/gateways/icon.png",
+  "icon": "assets/gateways/textures/block/gateway.png",
   "environment": "*",
   "accessWidener" : "gateways.accesswidener",
   "entrypoints": {
