@@ -17,6 +17,6 @@
     }
   },
   "result": {
-    "item": "gateways:gateway_hub"
+    "id": "gateways:gateway_hub"
   }
 }
