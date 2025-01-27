@@ -16,6 +16,7 @@ It adds the following features:
     - Crafted with a copper ingot and iron bars
     - When you shift right-click on a hub, it tunes the tuning fork to that hub's frequency
     - When you right click a hub with a tuned tuning fork, it gives the hub the frequency
+    - When you right click a block of resonant amethyst with a tuned tuning fork, it propagates the frequency through all connected resonant amethyst blocks (to a max of 10 blocks) to any connected hubs
 - Resonant amethyst
     - Crafted with two amethyst blocks and two glowstone dust
     - Works the same as amethyst, is valid for gateway pads
@@ -29,4 +30,4 @@ It adds the following features:
 - Resonance conduit
     - Crafted with two polished basalt and a resonant amethyst
     - Stores a tuning fork
-    - When powered from below, propagates a frequency downward (directly to a hub or to a hub connected through resonant amethyst)
+    - When powered from below, propagates the frequency downward, just like a tuning fork. It has the same max propagation distance of ten blocks
