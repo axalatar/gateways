@@ -1,7 +1,9 @@
 ## Gateways
 
 Gateways is a Minecraft mod which adds gateways you can teleport around with. 
+
 Check it out here: [https://modrinth.com/mod/gateway](https://modrinth.com/mod/gateway)
+
 It adds the following features:
 
 - Gateway hub
